@@ -144,3 +144,6 @@ obj-$(CONFIG_MOBICORE_SUPPORT)  += gud/
 obj-$(CONFIG_CORESIGHT)		+= coresight/
 
 obj-$(CONFIG_BIF)		+= bif/
+obj-$(CONFIG_HUAWEI_FACTORY_INFO) += hw_fac_info/
+
+obj-$(CONFIG_HUAWEI_HW_DEV_DCT) += devdetect/

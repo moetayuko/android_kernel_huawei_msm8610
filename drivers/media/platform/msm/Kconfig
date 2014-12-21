@@ -34,6 +34,15 @@ config MSMB_CAMERA_DEBUG
 	---help---
 	  Enable printk() debug for msm camera 2.0
 
+config HUAWEI_KERNEL_CAMERA
+	bool "HUAWEI KERNEL CAMERA"
+	depends on  HUAWEI_KERNEL
+	default n
+	---help---
+	  Say yes if you want enable HUAWEI CAMERA SENSOR driver.
+	  Enable this,you can add drivers of HUAWEI CAMERA SENSOR.
+	  If unsure, say Y here.
+
 if MSMB_CAMERA
 source "drivers/media/platform/msm/camera_v2/Kconfig"
 endif # MSMB_CAMERA

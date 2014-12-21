@@ -94,10 +94,15 @@ static struct gpiomux_setting focaltech_reset_act_cfg = {
 	.pull = GPIOMUX_PULL_UP,
 };
 
+/*Add synaptics new driver "Synaptics DSX I2C V2.0"*/
 static struct gpiomux_setting focaltech_reset_sus_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_6MA,
+#ifndef CONFIG_HUAWEI_KERNEL
 	.pull = GPIOMUX_PULL_UP,
+#else
+	.dir =	GPIOMUX_OUT_LOW,
+#endif
 };
 
 static struct gpiomux_setting wcnss_5wire_suspend_cfg = {
@@ -165,7 +170,20 @@ static struct gpiomux_setting gpio_int_sus_cfg = {
 	.pull = GPIOMUX_PULL_UP,
 	.dir = GPIOMUX_IN,
 };
-
+#ifdef CONFIG_HUAWEI_KERNEL
+static struct gpiomux_setting nfc_wake_int_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_DOWN,
+	.dir = GPIOMUX_OUT_LOW,
+};
+static struct gpiomux_setting nfc_interrupt_int_cfg = {
+	.func = GPIOMUX_FUNC_GPIO,
+	.drv = GPIOMUX_DRV_2MA,
+	.pull = GPIOMUX_PULL_DOWN,
+	.dir = GPIOMUX_IN,
+};
+#endif
 static struct msm_gpiomux_config msm_gpio_int_configs[] __initdata = {
 	{
 		.gpio = 84,
@@ -174,6 +192,23 @@ static struct msm_gpiomux_config msm_gpio_int_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED]	= &gpio_int_sus_cfg,
 		},
 	},
+#ifdef CONFIG_HUAWEI_KERNEL
+	{
+		.gpio = 75,	/*NFC_CLK_REQ */
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &nfc_interrupt_int_cfg,
+			[GPIOMUX_SUSPENDED] = &nfc_interrupt_int_cfg,
+		},
+	},	
+	{
+		.gpio = 91,	/*NFC_wake */
+		.settings = {
+			[GPIOMUX_ACTIVE]    = &nfc_wake_int_cfg,
+			[GPIOMUX_SUSPENDED] = &nfc_wake_int_cfg,
+		},
+	},
+#endif
+	
 };
 
 static struct msm_gpiomux_config msm_lcd_configs[] __initdata = {
@@ -470,6 +505,7 @@ static struct msm_gpiomux_config msm_sensor_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[1],
 		},
 	},
+#ifndef CONFIG_HUAWEI_KERNEL
 	{
 		.gpio = 8, /* CAM1_STANDBY_N */
 		.settings = {
@@ -477,6 +513,7 @@ static struct msm_gpiomux_config msm_sensor_configs[] __initdata = {
 			[GPIOMUX_SUSPENDED] = &gpio_suspend_config[1],
 		},
 	},
+#endif
 	{
 		.gpio = 15, /* CAM1_RST_N */
 		.settings = {

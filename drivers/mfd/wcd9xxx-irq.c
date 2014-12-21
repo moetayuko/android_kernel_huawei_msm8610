@@ -150,6 +150,7 @@ bool wcd9xxx_lock_sleep(
 				      msm_cpuidle_get_deep_idle_latency());
 	}
 	mutex_unlock(&wcd9xxx_res->pm_lock);
+	/* qcom patch to solve headset detect after or in sleep mode */
 
 	if (!wait_event_timeout(wcd9xxx_res->pm_wq,
 				((os =  wcd9xxx_pm_cmpxchg(wcd9xxx_res,

@@ -179,6 +179,11 @@ struct ci13xxx {
 	bool                      skip_flush; /* skip flushing remaining EP
 						upon flush timeout for the
 						first EP. */
+#ifdef CONFIG_HUAWEI_KERNEL
+	struct delayed_work        enmu_delay_work;
+	struct delayed_work re_enum_delay_work;
+	struct wake_lock non_standard_wake_lock;
+#endif
 };
 
 /******************************************************************************

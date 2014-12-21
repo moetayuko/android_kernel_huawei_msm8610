@@ -135,3 +135,11 @@ config AC97_BUS
 	  sound subsystem and other function drivers completely unrelated to
 	  sound although they're sharing the AC97 bus. Concerned drivers
 	  should "select" this.
+
+config HUAWEI_AUDIO_INFO
+	default y
+	depends on HUAWEI_KERNEL
+	bool "HUAWEI Audio INFO"
+	help
+		Say yes if you want enable audio info driver.
+		This is for distinguish the different product. If unsure, say Y here.

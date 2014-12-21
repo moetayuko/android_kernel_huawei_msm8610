@@ -25,6 +25,10 @@
 #include "sdio_cis.h"
 #include "bus.h"
 
+#ifdef CONFIG_HUAWEI_MMC
+#include "hw_extern_sdcard.h"
+#endif
+
 #define to_mmc_driver(d)	container_of(d, struct mmc_driver, drv)
 #define RUNTIME_SUSPEND_DELAY_MS 10000
 
@@ -423,6 +427,13 @@ int mmc_add_card(struct mmc_card *card)
 			pm_runtime_enable(&card->dev);
 	}
 
+#ifdef CONFIG_HUAWEI_MMC
+    if(MMC_TYPE_SD  == card->type)
+    {
+        hw_extern_sdcard_insert();
+    }
+#endif
+
 	ret = device_add(&card->dev);
 	if (ret)
 		return ret;
@@ -465,6 +476,12 @@ void mmc_remove_card(struct mmc_card *card)
 			pr_info("%s: card %04x removed\n",
 				mmc_hostname(card->host), card->rca);
 		}
+#ifdef CONFIG_HUAWEI_MMC
+        if(MMC_TYPE_SD  == card->type)
+        {
+            hw_extern_sdcard_remove();
+        }
+#endif
 		device_del(&card->dev);
 	}
 

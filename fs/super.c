@@ -38,6 +38,9 @@
 
 LIST_HEAD(super_blocks);
 DEFINE_SPINLOCK(sb_lock);
+#ifdef CONFIG_MMC_WP_SYSTEM
+DEFINE_SPINLOCK(mmc_wp_flag_lock);
+#endif
 
 /*
  * One thing we have to be careful of with a per-sb shrinker is that we don't
@@ -786,11 +789,17 @@ cancel_readonly:
 	sb->s_readonly_remount = 0;
 	return retval;
 }
-
+#ifdef CONFIG_MMC_WP_SYSTEM
+extern bool mmc_wp_partition_enable;
+#endif
 static void do_emergency_remount(struct work_struct *work)
 {
 	struct super_block *sb, *p = NULL;
-
+#ifdef CONFIG_MMC_WP_SYSTEM
+    spin_lock(&mmc_wp_flag_lock);	
+    mmc_wp_partition_enable = false;
+    spin_unlock(&mmc_wp_flag_lock);
+#endif
 	spin_lock(&sb_lock);
 	list_for_each_entry(sb, &super_blocks, s_list) {
 		if (hlist_unhashed(&sb->s_instances))
@@ -815,6 +824,11 @@ static void do_emergency_remount(struct work_struct *work)
 		__put_super(p);
 	spin_unlock(&sb_lock);
 	kfree(work);
+#ifdef CONFIG_MMC_WP_SYSTEM
+    spin_lock(&mmc_wp_flag_lock);	
+    mmc_wp_partition_enable = true;
+    spin_unlock(&mmc_wp_flag_lock);
+#endif
 	printk("Emergency Remount complete\n");
 }
 

@@ -1,0 +1,37 @@
+
+/ {
+        qrd_batterydata: qcom,battery-data {
+                /include/ "HB3742A0EBC_xxx-4v35-2000mah.dtsi"
+        };
+};
+
+&pm8110_bms {
+        qcom,battery-data = <&qrd_batterydata>;
+};
+
+&pm8110_chg {
+	status = "okay";
+	qcom,vddmax-mv = <4350>;
+	qcom,vddsafe-mv = <4380>;
+	qcom,tchg-mins = <360>;
+	qcom,battery-data = <&qrd_batterydata>;
+};
+&pm8110_mpps {
+	mpp@a300 {
+		status = "okay";
+		qcom,mode = <4>; 
+		qcom,invert = <1>;
+		qcom,ain-route = <3>;
+		qcom,master-en = <1>;
+		qcom,src-sel = <0>;
+	};
+
+};
+&pm8110_vadc {
+	pa_mpp_number = <19>;
+	chan@13 {
+		qcom,scale-function = <0x8>;
+	};
+};
+
+

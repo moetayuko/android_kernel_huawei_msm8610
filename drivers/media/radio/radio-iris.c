@@ -37,6 +37,9 @@
 #include <media/v4l2-ioctl.h>
 #include <media/radio-iris.h>
 #include <asm/unaligned.h>
+#ifdef CONFIG_HUAWEI_RADIO
+#include <linux/debugfs.h>
+#endif
 
 static unsigned int rds_buf = 100;
 static int oda_agt;
@@ -51,6 +54,10 @@ static char rt_ert_flag;
 static char formatting_dir;
 static unsigned char sig_blend = CTRL_ON;
 static DEFINE_MUTEX(iris_fm);
+#ifdef CONFIG_HUAWEI_RADIO
+int fm_debug_mask = 1;
+static struct dentry *dentry_fmlog;
+#endif
 
 module_param(rds_buf, uint, 0);
 MODULE_PARM_DESC(rds_buf, "RDS buffer entries: *100*");
@@ -492,6 +499,43 @@ static struct v4l2_queryctrl iris_v4l2_queryctrl[] = {
 	.default_value  =       0,
 	},
 };
+
+#ifdef CONFIG_HUAWEI_RADIO
+/*************************************************
+  Function:        debug_mask_set
+  Description:     this func is to set the value to control log enable or disable
+  Calls:           none
+  Called By:       echo
+  Input:           data:address of register
+                   val:to control log enable or disable
+  Output:          none
+  Return:          0
+  Others:          none
+*************************************************/
+static int debug_mask_set(void *data, u64 val)
+{
+    fm_debug_mask = (int)val;
+    return 0;
+}
+
+/*************************************************
+  Function:        debug_mask_get
+  Description:     this func is to get the value of control log enable or disable
+  Calls:           none
+  Called By:       cat
+  Input:           data:address of register
+  Output:          *val:to control log enable or disable
+  Return:          0
+  Others:          none
+*************************************************/
+static int debug_mask_get(void *data, u64 *val)
+{
+    *val = (u64)fm_debug_mask;
+    return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(debug_mask_fops,debug_mask_get, debug_mask_set, "%llu\n");
+#endif
 
 static void iris_q_event(struct iris_device *radio,
 				enum iris_evt_t event)
@@ -2585,6 +2629,9 @@ static int iris_search(struct iris_device *radio, int on, int dir)
 			radio->srch_st.srch_dir = dir;
 			retval = hci_fm_search_stations(
 				&radio->srch_st, radio->fm_hdev);
+                        #ifdef CONFIG_HUAWEI_RADIO
+                        FMDBG("FM search stations(srch_mode = %d),line:%d.\n", srch,__LINE__);
+                        #endif
 			break;
 		}
 
@@ -3187,9 +3234,15 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 		break;
 	case V4L2_CID_PRIVATE_IRIS_SRCHMODE:
 		radio->g_search_mode = ctrl->value;
+                #ifdef CONFIG_HUAWEI_RADIO
+                FMDBG("FM set search mode(radio->g_search_model = %d),line:%d.\n", radio->g_search_mode,__LINE__);
+                #endif
 		break;
 	case V4L2_CID_PRIVATE_IRIS_SCANDWELL:
 		radio->g_scan_time = ctrl->value;
+                #ifdef CONFIG_HUAWEI_RADIO
+                FMDBG("FM set scan time(radio->g_scan_time = %d),line:%d.\n", radio->g_scan_time,__LINE__);
+                #endif
 		break;
 	case V4L2_CID_PRIVATE_IRIS_SRCHON:
 		iris_search(radio, ctrl->value, SRCH_DIR_UP);
@@ -3202,6 +3255,9 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 			radio->mode = FM_RECV_TURNING_ON;
 			retval = hci_cmd(HCI_FM_ENABLE_RECV_CMD,
 							 radio->fm_hdev);
+            #ifdef CONFIG_HUAWEI_RADIO
+            FMDBG("FM set state to enable(retval = %d),line:%d.\n", retval,__LINE__);
+            #endif
 			if (retval < 0) {
 				FMDERR("Error while enabling RECV FM"
 							" %d\n", retval);
@@ -3233,6 +3289,9 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 				radio->mode = FM_TURNING_OFF;
 				retval = hci_cmd(HCI_FM_DISABLE_RECV_CMD,
 						radio->fm_hdev);
+                #ifdef CONFIG_HUAWEI_RADIO
+                FMDBG("FM set state to disable(retval = %d),line:%d.\n", retval,__LINE__);
+                #endif
 				if (retval < 0) {
 					FMDERR("Err on disable recv FM"
 						   " %d\n", retval);
@@ -3270,6 +3329,9 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 			else
 				retval = -EINVAL;
 		}
+        #ifdef CONFIG_HUAWEI_RADIO
+        FMDBG("set FM Band (REGION:retval = %d),line:%d.\n",retval,__LINE__);
+        #endif
 		break;
 	case V4L2_CID_PRIVATE_IRIS_SIGNAL_TH:
 		temp_val = ctrl->value;
@@ -3300,6 +3362,9 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 			if (retval < 0)
 				FMDERR("Error in setting channel spacing");
 		}
+        #ifdef CONFIG_HUAWEI_RADIO
+        FMDBG("set FM spacing (radio->recv_conf.ch_spacing = %d,retval = %d),line:%d.\n", radio->recv_conf.ch_spacing, retval,__LINE__);
+        #endif
 		break;
 	case V4L2_CID_PRIVATE_IRIS_EMPHASIS:
 		switch (radio->mode) {
@@ -3308,6 +3373,9 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 			retval = hci_set_fm_recv_conf(
 					&radio->recv_conf,
 						radio->fm_hdev);
+            #ifdef CONFIG_HUAWEI_RADIO
+            FMDBG("set FM emphasis (radio->recv_conf.emphasis = %d,retval = %d),line:%d.\n", radio->recv_conf.emphasis, retval,__LINE__);
+            #endif
 			if (retval < 0)
 				FMDERR("Error in setting emphasis");
 			break;
@@ -3392,6 +3460,9 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 		retval = hci_fm_rds_grps_process(
 				&radio->g_rds_grp_proc_ps,
 				radio->fm_hdev);
+        #ifdef CONFIG_HUAWEI_RADIO
+        FMDBG("set FM psall (radio->g_rds_grp_proc_ps = %d,retval = %d),line:%d.\n", radio->g_rds_grp_proc_ps, retval,__LINE__);
+        #endif
 		break;
 	case V4L2_CID_PRIVATE_IRIS_AF_JUMP:
 		/*Clear the current AF jump settings*/
@@ -3415,6 +3486,9 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 			return retval;
 		}
 		radio->g_antenna =  ctrl->value;
+        #ifdef CONFIG_HUAWEI_RADIO
+        FMDBG("set FM antenna (radio->g_antenna  = %d,retval = %d),line:%d.\n", radio->g_antenna, retval,__LINE__);
+        #endif
 		break;
 	case V4L2_CID_RDS_TX_PTY:
 		radio->pty = ctrl->value;
@@ -3562,6 +3636,9 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 			FMDERR("Failed to set SINR threshold %d", retval);
 			return retval;
 		}
+                #ifdef CONFIG_HUAWEI_RADIO
+                FMDBG("set SINR threshold (radio->ch_det_threshold.sinr = %d),line:%d.\n", radio->ch_det_threshold.sinr,__LINE__);
+                #endif
 		break;
 
 	case V4L2_CID_PRIVATE_SINR_SAMPLES:
@@ -3577,6 +3654,9 @@ static int iris_vidioc_s_ctrl(struct file *file, void *priv,
 			FMDERR("Failed to set SINR samples  %d", retval);
 			return retval;
 		}
+                #ifdef CONFIG_HUAWEI_RADIO
+                FMDBG("set SINR samples (radio->ch_det_threshold.sinr_samples = %d),line:%d.\n", radio->ch_det_threshold.sinr_samples,__LINE__);
+                #endif
 		break;
 
 	case V4L2_CID_PRIVATE_IRIS_SRCH_ALGORITHM:
@@ -3946,8 +4026,15 @@ static int iris_vidioc_s_tuner(struct file *file, void *priv,
 {
 	struct iris_device *radio = video_get_drvdata(video_devdata(file));
 	int retval = 0;
-	if (tuner->index > 0)
+    #ifdef CONFIG_HUAWEI_RADIO
+    FMDBG("Enter %s ,line:%d\n", __func__,__LINE__);
+    #endif
+	if (tuner->index > 0){
+        #ifdef CONFIG_HUAWEI_RADIO
+        FMDERR("set tuner failed tuner->index = %d,line:%d\n", tuner->index,__LINE__);
+        #endif
 		return -EINVAL;
+    }
 
 	if (radio->mode == FM_RECV) {
 		radio->recv_conf.band_low_limit = tuner->rangelow / TUNE_PARAM;
@@ -3966,15 +4053,25 @@ static int iris_vidioc_s_tuner(struct file *file, void *priv,
 		}
 		if (retval < 0)
 			FMDERR(": set tuner failed with %d\n", retval);
+        #ifdef CONFIG_HUAWEI_RADIO
+        FMDBG("%s complete(retval = %d),line:%d.\n", __func__,retval,__LINE__);
+        #endif
 		return retval;
 	} else if (radio->mode == FM_TRANS) {
 			radio->trans_conf.band_low_limit =
 				tuner->rangelow / TUNE_PARAM;
 			radio->trans_conf.band_high_limit =
 				tuner->rangehigh / TUNE_PARAM;
-	} else
+	} else{
+        #ifdef CONFIG_HUAWEI_RADIO
+        FMDERR("set tuner failed retval = %d,line:%d\n", -EINVAL,__LINE__);
+        #endif
 		return -EINVAL;
+    }
 
+    #ifdef CONFIG_HUAWEI_RADIO
+    FMDBG("%s complete(retval = %d),line:%d.\n", __func__,retval,__LINE__);
+    #endif
 	return retval;
 }
 
@@ -3982,11 +4079,21 @@ static int iris_vidioc_g_frequency(struct file *file, void *priv,
 		struct v4l2_frequency *freq)
 {
 	struct iris_device *radio = video_get_drvdata(video_devdata(file));
+    #ifdef CONFIG_HUAWEI_RADIO
+    FMDBG("Enter %s ,line:%d\n", __func__,__LINE__);
+    #endif
 	if ((freq != NULL) && (radio != NULL)) {
 		freq->frequency =
 			radio->fm_st_rsp.station_rsp.station_freq * TUNE_PARAM;
-	} else
+	} else{
+        #ifdef CONFIG_HUAWEI_RADIO
+        FMDERR("get frequency failed retval = %d,line:%d\n", -EINVAL,__LINE__);
+        #endif
 		return -EINVAL;
+    }
+    #ifdef CONFIG_HUAWEI_RADIO
+    FMDBG("%s complete(freq->frequency = %d),line:%d.\n", __func__,freq->frequency,__LINE__);
+    #endif
 	return 0;
 }
 
@@ -3997,8 +4104,15 @@ static int iris_vidioc_s_frequency(struct file *file, void *priv,
 	int retval = -1;
 	freq->frequency = freq->frequency / TUNE_PARAM;
 
-	if (freq->type != V4L2_TUNER_RADIO)
+    #ifdef CONFIG_HUAWEI_RADIO
+    FMDBG("Enter %s, freq->frequency = %d,line:%d\n", __func__,freq->frequency,__LINE__);
+    #endif
+	if (freq->type != V4L2_TUNER_RADIO){
+        #ifdef CONFIG_HUAWEI_RADIO
+        FMDERR("set frequency failed freq->type = %d,line:%d\n", freq->type,__LINE__);
+        #endif
 		return -EINVAL;
+    }
 
 	/* We turn off RDS prior to tuning to a new station.
 	   because of a bug in SoC which prevents tuning
@@ -4026,6 +4140,9 @@ static int iris_vidioc_s_frequency(struct file *file, void *priv,
 
 	if (retval < 0)
 		FMDERR(" set frequency failed with %d\n", retval);
+    #ifdef CONFIG_HUAWEI_RADIO
+    FMDBG("%s complete(retval = %d),line:%d.\n", __func__,retval,__LINE__);
+    #endif
 	return retval;
 }
 
@@ -4035,14 +4152,25 @@ static int iris_fops_release(struct file *file)
 	int retval = 0;
 
 	FMDBG("Enter %s ", __func__);
-	if (radio == NULL)
+	if (radio == NULL){
+        #ifdef CONFIG_HUAWEI_RADIO
+        FMDERR("clsoe fm failed, radio is null,line:%d\n",__LINE__);
+        #endif
 		return -EINVAL;
+    }
 
-	if (radio->mode == FM_OFF)
+	if (radio->mode == FM_OFF){
+        #ifdef CONFIG_HUAWEI_RADIO
+        FMDBG("radio->mode ==  %d,line:%d\n", radio->mode,__LINE__);
+        #endif
 		return 0;
+    }
 
 	if (radio->mode == FM_RECV) {
 		radio->mode = FM_OFF;
+        #ifdef CONFIG_HUAWEI_RADIO
+        FMDBG("radio->mode ==  %d,line:%d\n", radio->mode,__LINE__);
+        #endif
 		retval = hci_cmd(HCI_FM_DISABLE_RECV_CMD,
 						radio->fm_hdev);
 	} else if (radio->mode == FM_TRANS) {
@@ -4053,6 +4181,9 @@ static int iris_fops_release(struct file *file)
 	if (retval < 0)
 		FMDERR("Err on disable FM %d\n", retval);
 
+    #ifdef CONFIG_HUAWEI_RADIO
+    FMDBG("%s complete(retval = %d),line:%d.\n", __func__,retval,__LINE__);
+    #endif
 	return retval;
 }
 
@@ -4123,6 +4254,9 @@ static int iris_vidioc_querycap(struct file *file, void *priv,
 	struct v4l2_capability *capability)
 {
 	struct iris_device *radio;
+        #ifdef CONFIG_HUAWEI_RADIO
+        FMDBG("Enter %s,line:%d\n", __func__,__LINE__);
+        #endif
 	radio = video_get_drvdata(video_devdata(file));
 	strlcpy(capability->driver, DRIVER_NAME, sizeof(capability->driver));
 	strlcpy(capability->card, DRIVER_CARD, sizeof(capability->card));
@@ -4353,6 +4487,21 @@ static struct platform_driver iris_driver = {
 
 static int __init iris_radio_init(void)
 {
+        #ifdef CONFIG_HUAWEI_RADIO
+        struct dentry *dentry_file;
+        dentry_fmlog = debugfs_create_dir("hw_fmlog", NULL);
+        if(dentry_fmlog)
+        {
+            dentry_file = debugfs_create_file("debug_mask", S_IFREG|S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH,
+                dentry_fmlog, NULL, &debug_mask_fops);
+            if (!dentry_file)
+            {
+                FMDERR("[%s] fail to create debugfs file !line:%d.\n",__func__, __LINE__);
+                debugfs_remove(dentry_fmlog);
+                return -ENOMEM;
+            }
+        }
+        #endif
 	return platform_driver_probe(&iris_driver, iris_probe);
 }
 module_init(iris_radio_init);

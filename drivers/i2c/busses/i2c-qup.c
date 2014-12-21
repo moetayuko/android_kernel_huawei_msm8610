@@ -1633,9 +1633,17 @@ blsp_core_init:
 			of_i2c_register_devices(&dev->adapter);
 		}
 
+		/*
+		 * We have seen issues of spurious interrupts because interrupts
+		 * were occuring in the rt-suspended state. As a work-around,
+		 * not calling pm_runtime_enable()
+		 */
+#ifndef CONFIG_HUAWEI_KERNEL
 		pm_runtime_set_autosuspend_delay(&pdev->dev, MSEC_PER_SEC);
 		pm_runtime_use_autosuspend(&pdev->dev);
 		pm_runtime_enable(&pdev->dev);
+#endif
+
 		return 0;
 	}
 

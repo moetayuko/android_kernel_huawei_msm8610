@@ -1,0 +1,9 @@
+ / {
+        huawei_fac_info {
+                  compatible = "huawei,hw_fac_info";
+                  fac,product_name = "H871G";
+                  fac,hardware_ver = "HD1G630MT_VERA";
+		  fac,software_ver = "MSM8x10_H871G_va";
+                  status = "ok";
+        };
+};

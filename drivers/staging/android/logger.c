@@ -32,6 +32,9 @@
 #ifndef CONFIG_LOGCAT_SIZE
 #define CONFIG_LOGCAT_SIZE 256
 #endif
+#ifdef CONFIG_HUAWEI_KERNEL
+static int minor_of_power = 0;
+#endif
 
 /*
  * struct logger_log - represents a specific log, such as 'main' or 'radio'
@@ -691,6 +694,13 @@ static long logger_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		reader = file->private_data;
 		ret = logger_set_version(reader, argp);
 		break;
+#ifdef CONFIG_HUAWEI_KERNEL
+	case FIONREAD:
+		if (minor_of_power == log->misc.minor) {
+			ret = -ENOTTY;
+		}
+		break;
+#endif
 	}
 
 	mutex_unlock(&log->mutex);
@@ -736,6 +746,10 @@ DEFINE_LOGGER_DEVICE(log_main, LOGGER_LOG_MAIN, CONFIG_LOGCAT_SIZE*1024)
 DEFINE_LOGGER_DEVICE(log_events, LOGGER_LOG_EVENTS, CONFIG_LOGCAT_SIZE*1024)
 DEFINE_LOGGER_DEVICE(log_radio, LOGGER_LOG_RADIO, CONFIG_LOGCAT_SIZE*1024)
 DEFINE_LOGGER_DEVICE(log_system, LOGGER_LOG_SYSTEM, CONFIG_LOGCAT_SIZE*1024)
+#ifdef CONFIG_HUAWEI_KERNEL
+DEFINE_LOGGER_DEVICE(log_exception, LOGGER_LOG_EXCEPTION, 64*1024)
+DEFINE_LOGGER_DEVICE(log_power, LOGGER_LOG_POWER, 64*1024)
+#endif
 
 static struct logger_log *get_log_from_minor(int minor)
 {
@@ -747,6 +761,14 @@ static struct logger_log *get_log_from_minor(int minor)
 		return &log_radio;
 	if (log_system.misc.minor == minor)
 		return &log_system;
+#ifdef CONFIG_HUAWEI_KERNEL
+	if (log_exception.misc.minor == minor)
+		return &log_exception;
+#endif
+#ifdef CONFIG_HUAWEI_KERNEL
+	if (log_power.misc.minor == minor)
+		return &log_power;
+#endif
 	return NULL;
 }
 
@@ -787,7 +809,20 @@ static int __init logger_init(void)
 	if (unlikely(ret))
 		goto out;
 
+#ifdef CONFIG_HUAWEI_KERNEL
+	ret = init_log(&log_exception);
+	if (unlikely(ret))
+		goto out;
+#endif
+
 out:
+#ifdef CONFIG_HUAWEI_KERNEL
+	ret = init_log(&log_power);
+	if (unlikely(ret)) {
+		//do nothing
+	}
+	minor_of_power = log_power.misc.minor;
+#endif
 	return ret;
 }
 device_initcall(logger_init);

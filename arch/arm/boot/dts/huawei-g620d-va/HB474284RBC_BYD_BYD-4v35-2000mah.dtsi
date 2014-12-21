@@ -1,0 +1,122 @@
+/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+qcom,qrd-4v35-2000mAh-data {
+	qcom,fcc-mah = <2000>;
+	qcom,default-rbatt-mohm = <175>;
+	qcom,rbatt-capacitive-mohm = <0>;
+	qcom,flat-ocv-threshold-uv = <3800000>;
+	qcom,max-voltage-uv = <4350000>;
+	qcom,v-cutoff-uv = <3400000>;
+	qcom,chg-term-ua = <100000>;
+	qcom,batt-id-kohm = <10>;
+	qcom,batt-name = "HB474284RBC_BYD_BYD";
+
+	qcom,warm-bat-decidegc = <420>;
+	qcom,warm-bat-mv = <4250>;
+	qcom,ibatmax-warm-ma = <800>;
+
+	qcom,cool-bat-decidegc = <100>;
+	qcom,cool-bat-mv = <4350>;
+	qcom,ibatmax-cool-ma = <600>;
+
+	qcom,hot-bat-decidegc = <520>;
+	qcom,cold-bat-decidegc = <0>;
+	qcom,rbatt-sf-lut {
+		qcom,lut-col-legend = <(-20) 0 25 40 60>;
+		qcom,lut-row-legend = <100 95 90 85 80>,
+				<75 70 65 60 55>,
+				<50 45 40 35 30>,
+				<25 20 16 13 11>,
+				<10 9 8 7 6>,
+				<5 4 3 2 1>,
+				<0>;
+		qcom,lut-data = <1028 265 100 82 80>,
+                                <1025 265 100 82 80>,
+                                <945 267 101 84 81>,
+                                <945 270 105 85 82>,
+                                <978 294 108 88 84>,
+                                <980 289 117 92 85>,
+                                <950 250 117 94 87>,
+                                <937 256 124 99 91>,
+                                <945 250 116 102 94>,
+                                <968 249 100 89 86>,
+                                <1004 253 100 86 82>,
+                                <1053 262 101 87 84>,
+                                <1112 280 104 90 86>,
+                                <1183 305 106 93 88>,
+                                <1270 338 109 91 87>,
+                                <1386 381 109 89 84>,
+                                <1566 432 109 88 84>,
+                                <1914 492 110 88 83>,
+                                <2154 551 113 88 84>,
+                                <2364 573 118 92 85>,
+                                <2632 601 122 93 86>,
+                                <2932 633 128 95 87>,
+                                <3316 666 134 97 86>,
+                                <2634 691 140 97 85>,
+                                <2256 718 138 95 85>,
+                                <1898 757 145 97 86>,
+                                <2200 797 152 100 89>,
+                                <24782 850 168 106 92>,
+                                <16536 921 189 115 101>,
+                                <1146 1346 261 146 117>,
+                                <7025 22675 4921 4072 294>;
+	};
+
+	qcom,fcc-temp-lut {
+		qcom,lut-col-legend = <(-20) 0 25 40 60>;
+		qcom,lut-data = <2053 2046 2042 2043 2034>;
+	};
+
+	qcom,pc-temp-ocv-lut {
+		qcom,lut-col-legend = <(-20) 0 25 40 60>;
+		qcom,lut-row-legend = <100 95 90 85 80>,
+				<75 70 65 60 55>,
+				<50 45 40 35 30>,
+				<25 20 16 13 11>,
+				<10 9 8 7 6>,
+				<5 4 3 2 1>,
+				<0>;
+		qcom,lut-data = <4312 4311 4300 4306 4300>,
+				<4213 4231 4236 4239 4235>,
+				<4141 4173 4182 4184 4181>,
+				<4094 4122 4131 4132 4129>,
+				<4027 4084 4083 4083 4080>,
+				<3943 4016 4039 4040 4033>,
+				<3902 3947 3980 3990 3991>,
+				<3865 3916 3951 3956 3953>,
+				<3838 3879 3906 3916 3915>,
+				<3816 3847 3863 3869 3868>,
+				<3799 3820 3835 3838 3837>,
+				<3785 3800 3814 3816 3815>,
+				<3771 3787 3796 3798 3797>,
+				<3757 3778 3781 3782 3780>,
+				<3743 3768 3769 3766 3760>,
+				<3724 3753 3756 3748 3735>,
+				<3702 3731 3734 3725 3711>,
+				<3676 3713 3705 3697 3684>,
+				<3645 3703 3690 3682 3670>,
+				<3613 3696 3688 3680 3668>,
+				<3591 3692 3686 3679 3667>,
+				<3564 3686 3684 3677 3665>,
+				<3528 3678 3680 3674 3660>,
+				<3469 3663 3668 3662 3644>,
+				<3391 3637 3637 3632 3612>,
+				<3326 3601 3593 3588 3569>,
+				<3251 3552 3537 3535 3515>,
+				<3117 3487 3468 3467 3447>,
+				<3233 3396 3374 3376 3359>,
+				<3230 3258 3238 3239 3227>,
+				<3000 3000 3000 3000 3000>;
+	};
+};

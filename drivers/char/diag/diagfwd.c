@@ -1262,6 +1262,21 @@ int diag_process_apps_pkt(unsigned char *buf, int len)
 						packet_type = 0;
 				}
 			}
+#ifdef CONFIG_HUAWEI_KERNEL
+			/* automation cmd_code is 0xF6 */
+			/* judge if it is automation cmd_code */
+			else if ((entry.cmd_code == 255) 
+					&& (entry.subsys_id == 0xF6) 
+					&& (cmd_code == 0xF6))
+			{
+				if ((entry.cmd_code_lo <= subsys_id) && (entry.cmd_code_hi >= subsys_id))
+				{
+					diag_send_data(entry, buf, len,data_type);
+					packet_type = 0;
+				}
+
+			}
+#endif
 		}
 	}
 #if defined(CONFIG_DIAG_OVER_USB)

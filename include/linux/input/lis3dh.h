@@ -38,6 +38,7 @@
 #define LIS3DH_ACC_I2C_SAD_H	((LIS3DH_ACC_I2C_SADROOT<<1)|SAD0H)
 #define	LIS3DH_ACC_DEV_NAME	"lis3dh_acc"
 #define ACCEL_INPUT_DEV_NAME	"accelerometer"
+#define ECS_IOCTL_READ_ACCEL_XYZ     _IOR(0xA1, 0x06, char[3])
 
 /************************************************/
 /*	Accelerometer defines section		*/

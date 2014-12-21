@@ -52,12 +52,16 @@
 #include <mach/msm_memtypes.h>
 
 #include "mdss_fb.h"
+#include <linux/hw_lcd_common.h>
 
 #ifdef CONFIG_FB_MSM_TRIPLE_BUFFER
 #define MDSS_FB_NUM 3
 #else
 #define MDSS_FB_NUM 2
 #endif
+
+/* Delete BKL_DELAY to use another variable */
+
 
 #define MAX_FBI_LIST 32
 static struct fb_info *fbi_list[MAX_FBI_LIST];
@@ -93,6 +97,23 @@ static int __mdss_fb_sync_buf_done_callback(struct notifier_block *p,
 
 static int __mdss_fb_display_thread(void *data);
 static void mdss_fb_pan_idle(struct msm_fb_data_type *mfd);
+#ifdef CONFIG_HUAWEI_LCD
+enum {
+      SET_FALSE = 0,
+      SET_TRUE
+};    
+/* Delete lcd_have_resume to use another variable */
+/* Delete backlight protect plan which added by huawei */
+#endif
+#ifdef CONFIG_FB_AUTO_CABC
+    /* used to config cabc in terms of cabc_cfg */
+    static int mdss_fb_config_cabc(struct msm_fb_data_type *mfd,struct msmfb_cabc_config cabc_cfg);
+    /* last_cabc_mode:record last cabc mode */
+    struct msmfb_cabc_config last_cabc_mode = {0,0,0};
+    /* last_cabc_setting:record last cabc setting */
+    u32 last_cabc_setting = SET_FALSE;
+#endif
+/* Delete code that we don't use */
 static int mdss_fb_send_panel_event(struct msm_fb_data_type *mfd,
 					int event, void *arg);
 void mdss_fb_no_update_notify_timer_cb(unsigned long data)
@@ -164,10 +185,11 @@ static void mdss_fb_set_bl_brightness(struct led_classdev *led_cdev,
 
 	if (!IS_CALIB_MODE_BL(mfd) && (!mfd->ext_bl_ctrl || !value ||
 							!mfd->bl_level)) {
-		mutex_lock(&mfd->bl_lock);
-		mdss_fb_set_backlight(mfd, bl_lvl);
-		mutex_unlock(&mfd->bl_lock);
-	}
+	/* Delete backlight protect plan which added by huawei */
+        mutex_lock(&mfd->bl_lock);
+        mdss_fb_set_backlight(mfd, bl_lvl);
+        mutex_unlock(&mfd->bl_lock);
+    }
 }
 
 static struct led_classdev backlight_led = {
@@ -633,6 +655,7 @@ void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl)
 	int (*update_ad_input)(struct msm_fb_data_type *mfd);
 	u32 temp = bkl_lvl;
 
+	LCD_LOG_DBG("%s: bl_updated = %d, bkl_lvl = %d\n",__func__,mfd->bl_updated,bkl_lvl);
 	if (((!mfd->panel_power_on && mfd->dcm_state != DCM_ENTER)
 		|| !mfd->bl_updated) && !IS_CALIB_MODE_BL(mfd)) {
 		mfd->unset_bl_level = bkl_lvl;
@@ -672,11 +695,36 @@ void mdss_fb_set_backlight(struct msm_fb_data_type *mfd, u32 bkl_lvl)
 	}
 }
 
+/* solve panel probability can't turn on blacklight when calling */
+#ifdef CONFIG_HUAWEI_LCD
+void mdss_fb_update_backlight_wq_handler(struct work_struct *work)
+{
+	struct mdss_panel_data *pdata;
+	struct msm_fb_data_type *mfd;
+	mfd = container_of(to_delayed_work(work), struct msm_fb_data_type, bkl_work);
+
+	LCD_LOG_DBG("%s: enter\n",__func__);
+	mutex_lock(&mfd->bl_lock);
+	if (mfd->unset_bl_level) {
+		pdata = dev_get_platdata(&mfd->pdev->dev);
+		if ((pdata) && (pdata->set_backlight)) {
+			mfd->bl_level = mfd->unset_bl_level;
+			pdata->set_backlight(pdata, mfd->bl_level);
+			mfd->bl_level_old = mfd->unset_bl_level;
+			/* make sure bkl be set once in this function */
+			mfd->unset_bl_level = 0;
+			LCD_LOG_INFO("%s: set backlight to %d\n",__func__,mfd->bl_level);
+		}
+	}
+	mfd->bl_updated = 1;
+	mutex_unlock(&mfd->bl_lock);
+}
+#else
 void mdss_fb_update_backlight(struct msm_fb_data_type *mfd)
 {
 	struct mdss_panel_data *pdata;
-
 	if (mfd->unset_bl_level && !mfd->bl_updated) {
+
 		pdata = dev_get_platdata(&mfd->pdev->dev);
 		if ((pdata) && (pdata->set_backlight)) {
 			mutex_lock(&mfd->bl_lock);
@@ -688,11 +736,16 @@ void mdss_fb_update_backlight(struct msm_fb_data_type *mfd)
 		}
 	}
 }
+#endif
 
 static int mdss_fb_blank_sub(int blank_mode, struct fb_info *info,
 			     int op_enable)
 {
 	struct msm_fb_data_type *mfd = (struct msm_fb_data_type *)info->par;
+#ifdef CONFIG_HUAWEI_LCD
+    /* pdata is panel infomation */
+    struct mdss_panel_data *pdata = NULL;
+#endif
 	int ret = 0;
 
 	if (!op_enable)
@@ -701,6 +754,14 @@ static int mdss_fb_blank_sub(int blank_mode, struct fb_info *info,
 	if (mfd->dcm_state == DCM_ENTER)
 		return -EPERM;
 
+#ifdef CONFIG_HUAWEI_LCD
+    /* get platdata by mfd give to pdata */
+    pdata = dev_get_platdata(&mfd->pdev->dev);
+    if (!pdata) {
+		LCD_LOG_ERR( "mdss_fb_blank_sub: no panel operation detected!\n");
+        return -ENODEV;
+    }
+#endif
 	switch (blank_mode) {
 	case FB_BLANK_UNBLANK:
 		if (!mfd->panel_power_on && mfd->mdp.on_fnc) {
@@ -712,6 +773,22 @@ static int mdss_fb_blank_sub(int blank_mode, struct fb_info *info,
 			mutex_lock(&mfd->update.lock);
 			mfd->update.type = NOTIFY_TYPE_UPDATE;
 			mutex_unlock(&mfd->update.lock);
+#ifdef CONFIG_HUAWEI_LCD
+            /*writeback panel no need for the following setting, only for lcd panel */
+            if(pdata->panel_info.type != WRITEBACK_PANEL)
+            {
+				/* Delete code that we don't use */
+                /*when lcd resume, firstly we set the saved cabc values if necessary*/
+#ifdef CONFIG_FB_AUTO_CABC
+                if(SET_TRUE == last_cabc_setting)
+                {
+                    mdss_fb_config_cabc(mfd, last_cabc_mode);
+                    last_cabc_setting =SET_FALSE;
+                    LCD_LOG_DBG("%s:Waiting for LCD resume ,then set cabc mode =%d\n",__func__,last_cabc_mode.mode);
+                }
+#endif
+            }
+#endif
 		}
 		break;
 
@@ -722,7 +799,7 @@ static int mdss_fb_blank_sub(int blank_mode, struct fb_info *info,
 	default:
 		if (mfd->panel_power_on && mfd->mdp.off_fnc) {
 			int curr_pwr_state;
-
+			/* Delete code that we don't use */
 			mutex_lock(&mfd->update.lock);
 			mfd->update.type = NOTIFY_TYPE_SUSPEND;
 			mutex_unlock(&mfd->update.lock);
@@ -733,14 +810,18 @@ static int mdss_fb_blank_sub(int blank_mode, struct fb_info *info,
 			mfd->op_enable = false;
 			curr_pwr_state = mfd->panel_power_on;
 			mfd->panel_power_on = false;
-			mfd->bl_updated = 0;
 
+			/* make sure bl_pudated is 0 when power on */
+			cancel_delayed_work_sync(&mfd->bkl_work);
+			LCD_LOG_DBG("%s: cancle bkl_delay work \n",__func__);
 			ret = mfd->mdp.off_fnc(mfd);
 			if (ret)
 				mfd->panel_power_on = curr_pwr_state;
 			else
 				mdss_fb_release_fences(mfd);
 			mfd->op_enable = true;
+			mfd->bl_updated = 0;
+			LCD_LOG_DBG("%s: bl_updated set as 0 when panel off \n",__func__);
 			complete(&mfd->power_off_comp);
 		}
 		break;
@@ -1099,8 +1180,16 @@ static int mdss_fb_register(struct msm_fb_data_type *mfd)
 	init_completion(&mfd->no_update.comp);
 	init_completion(&mfd->power_off_comp);
 	init_completion(&mfd->power_set_comp);
+
+/* solve panel probability can't turn on blacklight when calling */
+#ifdef CONFIG_HUAWEI_LCD
+	INIT_DELAYED_WORK(&mfd->bkl_work, mdss_fb_update_backlight_wq_handler);
+#endif
+
+
 	init_waitqueue_head(&mfd->commit_wait_q);
 	init_waitqueue_head(&mfd->idle_wait_q);
+
 
 	ret = fb_alloc_cmap(&fbi->cmap, 256, 0);
 	if (ret)
@@ -1482,6 +1571,13 @@ static int mdss_fb_pan_display_sub(struct fb_var_screeninfo *var,
 		pr_warn("dma function not set for panel type=%d\n",
 				mfd->panel.type);
 
+
+#ifdef CONFIG_HUAWEI_LCD
+	schedule_delayed_work(&mfd->bkl_work,0);
+#else
+	mdss_fb_update_backlight(mfd);
+#endif
+
 	return 0;
 }
 
@@ -1498,6 +1594,8 @@ static void mdss_fb_var_to_panelinfo(struct fb_var_screeninfo *var,
 	pinfo->lcdc.h_pulse_width = var->hsync_len;
 	pinfo->clk_rate = var->pixclock;
 }
+
+
 
 /**
  * __mdss_fb_perform_commit() - process a frame to display
@@ -1530,9 +1628,18 @@ static int __mdss_fb_perform_commit(struct msm_fb_data_type *mfd)
 			pr_err("pan display failed %x on fb%d\n", ret,
 					mfd->index);
 	}
+	
+	/* add delay time before backlight on */
 	if (!ret)
+	{
+#ifdef CONFIG_HUAWEI_LCD
+		LCD_LOG_DBG("%s:%d schedule work delaytime=%d ms\n",__func__,__LINE__,mfd->panel_info->delaytime_before_bl);
+		schedule_delayed_work(&mfd->bkl_work,
+			msecs_to_jiffies(mfd->panel_info->delaytime_before_bl));
+#else
 		mdss_fb_update_backlight(mfd);
-
+#endif
+	}
 	if (IS_ERR_VALUE(ret) || !sync_pt_data->flushed)
 		mdss_fb_signal_timeline(sync_pt_data);
 
@@ -1819,6 +1926,39 @@ static int mdss_fb_set_lut(struct fb_info *info, void __user *p)
 	return 0;
 }
 
+/* Delete code that we don't use */
+#ifdef CONFIG_FB_AUTO_CABC
+/***************************************************************
+Function: mdss_fb_config_cabc
+Description: Config CABC parameter
+Parameters:
+    struct msm_fb_data_type *mfd: mfd pointer
+    struct msmfb_cabc_config cabc_cfg: CABC config structure
+Return:
+    0: success
+***************************************************************/
+/* delete mutex lock in this function */
+static int mdss_fb_config_cabc(struct msm_fb_data_type *mfd,struct msmfb_cabc_config cabc_cfg)
+{
+    int ret = 0;
+    struct mdss_panel_data *pdata = NULL;
+
+    pdata = dev_get_platdata(&mfd->pdev->dev);
+    /* config cabc interms of pdata and pdata->config_cabc*/
+    if ((pdata) && (pdata->config_cabc))
+    {
+        ret = pdata->config_cabc(pdata,cabc_cfg);
+    }
+    else
+    {
+        LCD_LOG_ERR("This panel can not support auto cabc function\n");
+        ret = -EINVAL;
+    }
+
+    return ret;
+}
+#endif
+
 /**
  * mdss_fb_sync_get_rel_fence() - get release fence from sync pt timeline
  * @sync_pt_data:	Sync pt structure holding timeline and fence info.
@@ -1961,6 +2101,10 @@ static int mdss_fb_display_commit(struct fb_info *info,
 static int mdss_fb_ioctl(struct fb_info *info, unsigned int cmd,
 			 unsigned long arg)
 {
+	/* Delete this code we that we don't use */
+#ifdef CONFIG_FB_AUTO_CABC
+    struct msmfb_cabc_config cabc_cfg = {0,0,0};
+#endif
 	struct msm_fb_data_type *mfd;
 	void __user *argp = (void __user *)arg;
 	struct mdp_page_protection fb_page_protection;
@@ -1993,6 +2137,30 @@ static int mdss_fb_ioctl(struct fb_info *info, unsigned int cmd,
 			return ret;
 		break;
 
+#ifdef CONFIG_FB_AUTO_CABC
+    case MSMFB_AUTO_CABC:
+        ret = copy_from_user(&cabc_cfg, argp, sizeof(cabc_cfg));
+        if (ret)
+        {
+            pr_err(KERN_ERR "%s:MSMFB_AUTO_CABC ioctl failed \n",__func__);
+            return ret;
+        }
+
+        /* if lcd is not power on, save the cabc_mode value, so it will be set when lcd on */
+        if(!mfd->panel_power_on)
+        {
+            last_cabc_mode = cabc_cfg;
+            last_cabc_setting = SET_TRUE;
+            pr_debug(KERN_INFO "%s:MSMFB_AUTO_CABC save last setting \n",__func__);
+        }
+        else
+        {
+            ret = mdss_fb_config_cabc(mfd, cabc_cfg);
+            last_cabc_setting = SET_FALSE;
+        }
+        break;
+#endif
+	/* Delete this code we that we don't use */
 	case MSMFB_BUFFER_SYNC:
 		ret = copy_from_user(&buf_sync, argp, sizeof(buf_sync));
 		if (ret)

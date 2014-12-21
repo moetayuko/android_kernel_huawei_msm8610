@@ -173,7 +173,6 @@ struct msm8x10_wcd {
 	int num_irqs;
 	u32 mclk_rate;
 	char __iomem *pdino_base;
-
 	struct wcd9xxx_core_resource wcd9xxx_res;
 };
 

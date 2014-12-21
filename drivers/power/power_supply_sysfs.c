@@ -139,6 +139,10 @@ static struct device_attribute power_supply_attrs[] = {
 	POWER_SUPPLY_ATTR(present),
 	POWER_SUPPLY_ATTR(online),
 	POWER_SUPPLY_ATTR(charging_enabled),
+#ifdef CONFIG_HUAWEI_KERNEL
+	POWER_SUPPLY_ATTR(factory_diag),
+	POWER_SUPPLY_ATTR(hot_current_limit),
+#endif
 	POWER_SUPPLY_ATTR(technology),
 	POWER_SUPPLY_ATTR(cycle_count),
 	POWER_SUPPLY_ATTR(voltage_max),

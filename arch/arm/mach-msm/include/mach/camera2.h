@@ -113,6 +113,8 @@ struct eeprom_map_t {
 };
 
 struct eeprom_memory_map_t {
+	/*add for muti i2c slave*/
+	struct eeprom_map_t slave_addr;
 	struct eeprom_map_t page;
 	struct eeprom_map_t pageen;
 	struct eeprom_map_t poll;

@@ -1,0 +1,6 @@
+&soc {
+        huawei,huawei-mem-hole {
+                compatible = "huawei,huawei-mem-hole";
+                huawei,memblock-remove-huawei = <0x12c00000 0x100000>;
+        };
+     };

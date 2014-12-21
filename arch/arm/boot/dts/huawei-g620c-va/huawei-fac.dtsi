@@ -1,0 +1,9 @@
+ / {
+        huawei_fac_info {
+                  compatible = "huawei,hw_fac_info";
+                  fac,product_name = "HUAWEI C8816";
+                  fac,hardware_ver = "HS1G620M_VERA";
+		  fac,software_ver = "MSM8x12_G620_C00_va";
+                  status = "ok";
+        };
+};

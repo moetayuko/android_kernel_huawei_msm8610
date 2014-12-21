@@ -1,0 +1,9 @@
+/ {
+        huawei_bt_info {
+                  compatible = "huawei,hw_bt_info";
+                  status = "ok";
+                  bt,fw_ver = "1.4.1.2";
+                  bt,power_level = "level8";
+        };
+       
+};

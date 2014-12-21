@@ -1,0 +1,206 @@
+//optimize the init code
+/* Copyright (c) 2013, The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+
+/ {
+        qcom,tianma_nt35516_4p5_qhd_cmd {
+                compatible = "huawei,lcd_panel_id5";
+                label = "TIANMA_NT35516_QHD_CMD";
+                qcom,dsi-ctrl-phandle = <&mdss_dsi0>;
+                qcom,rst-gpio = <&msmgpio 41 0>;
+		qcom,te-gpio = <&msmgpio 12 0>;
+                vdda-supply = <&pm8110_l19>;
+                vddio-supply=<&pm8110_l6>;
+                qcom,mdss-pan-res = <540 960>;
+                qcom,mdss-pan-bpp = <24>;
+                qcom,mdss-pan-dest = "display_1";
+                qcom,mdss-pan-porch-values = <12 3 2 50 10 50>;
+                qcom,mdss-pan-underflow-clr = <0xff>;
+                qcom,mdss-pan-bl-levels = <1 255>;
+                qcom,mdss-pan-bl-ctrl = "bl_ctrl_dcs";
+                qcom,mdss-pan-dsi-mode = <1>;
+		qcom,mdss-pan-te-sel= <1>;
+                qcom,mdss-pan-dsi-dst-format = <8>;
+		qcom,mdss-pan-insert-dcs-cmd = <1>;
+		qcom,mdss-pan-wr-mem-continue = <0x3c>;
+		qcom,mdss-pan-wr-mem-start = <0x2c>;
+                qcom,mdss-pan-dsi-vc = <0>;
+                qcom,mdss-pan-dsi-rgb-swap = <0>;
+                qcom,mdss-pan-dsi-data-lanes = <1 1 0 0>;
+                qcom,mdss-pan-dsi-dlane-swap = <1>;
+                qcom,mdss-pan-dsi-t-clk = <0x1b 0x04>;
+                qcom,mdss-pan-dsi-stream = <0>;
+                qcom,mdss-pan-dsi-mdp-tr = <0x2>;/*todo*/
+                qcom,mdss-pan-dsi-dma-tr = <0x04>;
+                qcom,mdss-pan-dsi-frame-rate = <60>;
+                qcom,panel-phy-regulatorSettings =[09 08 05 00 20 03];
+                qcom,panel-phy-timingSettings = [7A 1B 12 00 3F 49
+                                                17 1E 1E 03 04 00];
+                qcom,panel-phy-strengthCtrl = [ff 06];
+                qcom,panel-phy-bistCtrl = [03 03 00 00 0f 00];
+                qcom,panel-phy-laneConfig =
+                                        [80 45 00 00 01 66 /*lane0**/
+                                        80 45 00 00 01 66 /*lane1*/
+                                        80 45 00 00 01 66 /*lane2*/
+                                        80 45 00 00 01 66 /*lane3*/
+                                        40 67 00 00 01 88]; /*Clk*/
+
+                qcom,on-cmds-dsi-state = "DSI_LP_MODE";
+                qcom,panel-on-cmds = [39 01 00 00 00 05
+                                                        FF AA 55 25 01
+                                                39 01 00 00 00 24
+                                                        F2 00 00 4A 0A A8 00 00 00 00 00 00 00 00 00 00 00 00 0B 00 00 00 00 00 00 00 00 00 00 40 01 51 FF 01 FF 01
+                                                39 01 00 00 00 03
+                                                        F5 00 00
+                                                39 01 00 00 00 05
+                                                        FF AA 55 25 00
+                                                39 01 00 00 00 06
+                                                        F0 55 AA 52 08 00
+                                                39 01 00 00 00 02
+                                                        C7 70
+                                                39 01 00 00 00 0C
+                                                        CA 00 1B 1B 1B 1B 1B 1B 02 02 00 00
+                                                39 01 00 00 00 02
+                                                        BA 05
+                                                39 01 00 00 00 07
+                                                        C9 41 06 0d 3a 17 00
+                                                39 01 00 00 00 04
+                                                        B1 EC 06 00
+                                                39 01 00 00 00 04
+                                                        BC 00 00 00
+                                                39 01 00 00 00 03
+                                                        B7 72 22
+                                                39 01 00 00 00 05
+                                                        B8 01 02 02 00
+                                                39 01 00 00 00 04
+                                                        BB 53 03 53
+                                                39 01 00 00 00 06
+                                                        BD 01 69 05 05 01
+                                                39 01 00 00 00 02
+                                                        B6 0B
+                                                39 01 00 00 00 02
+                                                        3A 77
+                                                39 01 00 00 00 02
+                                                        36 00
+                                                39 01 00 00 00 06
+                                                        F0 55 AA 52 08 01
+                                                39 01 00 00 00 11
+                                                        D1 00 00 00 74 00 C9 01 05 01 16 01 3E 01 66 01 95
+                                                39 01 00 00 00 11
+                                                        D2 01 B8 01 E5 02 1B 02 5D 02 93 02 95 02 C4 02 F8
+                                                39 01 00 00 00 11
+                                                        D3 03 18 03 44 03 60 03 82 03 98 03 B5 03 DB 03 F0
+                                                39 01 00 00 00 05
+                                                        D4 03 F7 03 F8
+                                                39 01 00 00 00 11
+                                                        D5 00 00 00 74 00 C9 01 05 01 16 01 3E 01 66 01 95
+                                                39 01 00 00 00 11
+                                                        D6 01 B8 01 E5 02 1B 02 5D 02 93 02 95 02 C4 02 F8
+                                                39 01 00 00 00 11
+                                                        D7 03 18 03 44 03 60 03 82 03 98 03 B5 03 DB 03 F0
+                                                39 01 00 00 00 05
+                                                        D8 03 F7 03 F8     
+                                                39 01 00 00 00 11
+                                                        D9 00 00 00 74 00 C9 01 05 01 16 01 3E 01 66 01 95
+                                                39 01 00 00 00 11
+                                                        DD 01 B8 01 E5 02 1B 02 5D 02 93 02 95 02 C4 02 F8
+                                                39 01 00 00 00 11
+                                                        DE 03 18 03 44 03 60 03 82 03 98 03 B5 03 DB 03 F0
+                                                39 01 00 00 00 05
+                                                        DF 03 F7 03 F8 
+                                                39 01 00 00 00 11
+                                                        E0 00 00 00 74 00 C9 01 05 01 16 01 3E 01 66 01 95	
+                                                39 01 00 00 00 11
+                                                        E1 01 B8 01 E5 02 1B 02 5D 02 93 02 95 02 C4 02 F8	
+                                                39 01 00 00 00 11
+                                                        E2 03 18 03 44 03 60 03 82 03 98 03 B5 03 DB 03 F0
+                                                39 01 00 00 00 05
+                                                        E3 03 F7 03 F8
+                                                39 01 00 00 00 11
+                                                        E4 00 00 00 74 00 C9 01 05 01 16 01 3E 01 66 01 95	
+                                                39 01 00 00 00 11
+                                                        E5 01 B8 01 E5 02 1B 02 5D 02 93 02 95 02 C4 02 F8	
+                                                39 01 00 00 00 11
+                                                        E6 03 18 03 44 03 60 03 82 03 98 03 B5 03 DB 03 F0
+                                                39 01 00 00 00 05
+                                                        E7 03 F7 03 F8	
+                                                39 01 00 00 00 11
+                                                        E8 00 00 00 74 00 C9 01 05 01 16 01 3E 01 66 01 95	
+                                                39 01 00 00 00 11
+                                                        E9 01 B8 01 E5 02 1B 02 5D 02 93 02 95 02 C4 02 F8
+                                                39 01 00 00 00 11
+                                                        EA 03 18 03 44 03 60 03 82 03 98 03 B5 03 DB 03 F0
+                                                39 01 00 00 00 05
+                                                        EB 03 F7 03 F8
+                                                39 01 00 00 00 02
+                                                        B0 0A
+                                                39 01 00 00 00 02
+                                                        B6 54
+                                                39 01 00 00 00 02
+                                                        B1 0A
+                                                39 01 00 00 00 02
+                                                        B7 34
+                                                39 01 00 00 00 02
+                                                        B2 00
+                                                39 01 00 00 00 02
+                                                        B8 30
+                                                39 01 00 00 00 02
+                                                        B3 0D
+                                                39 01 00 00 00 02
+                                                        B9 24
+                                                39 01 00 00 00 02
+                                                        B4 08
+                                                39 01 00 00 00 02
+                                                        BA 14
+                                                39 01 00 00 00 04
+                                                        BC 00 78 00
+                                                39 01 00 00 00 04
+                                                        BD 00 78 00
+                                                39 01 00 00 00 02
+                                                        BF 00
+                                                39 01 00 00 00 06
+                                                        F0 55 AA 52 00 00
+                                                39 01 00 00 00 02
+                                                        36 00
+                                                39 01 00 00 00 02
+                                                        35 00
+                                                39 01 00 00 00 03
+                                                        44 01 E0
+                                                39 01 00 00 00 02
+                                                        51 00
+                                                39 01 00 00 00 02
+                                                        53 24
+                                                39 01 00 00 00 02
+                                                        55 01
+                                                05 01 00 00 78 02
+                                                        11 00
+                                                05 01 00 00 14 02
+                                                        29 00];
+                qcom,panel-off-cmds = [05 01 00 00 32 02 28 00
+                                        05 01 00 00 78 02 10 00];
+
+                qcom,off-cmds-dsi-state = "DSI_LP_MODE";
+				                qcom,panel-cabc-ui-cmds = [13 01 00 00 00 02 55 01
+                                           13 01 00 00 00 02 53 24];
+                qcom,cabc-ui-cmds-dsi-state = "DSI_LP_MODE";
+                qcom,panel-cabc-video-cmds = [13 01 00 00 00 02 55 03
+                                              13 01 00 00 00 02 53 2c];
+                qcom,cabc-video-cmds-dsi-state = "DSI_LP_MODE";
+                qcom,panel-gamma-22-cmds = [39 01 00 00 01 11
+                                          E1 01 0D 14 0E 07 13 0B 0A 02 06 08 08 0e 12 0d 01
+                                            39 01 00 00 01 11
+                                          E2 01 0D 14 0E 07 13 0B 0A 02 06 08 08 0e 12 0d 01];
+                qcom,gamma-22-cmds-dsi-state = "DSI_LP_MODE";
+                qcom,panel-gamma-25-cmds = [13 01 00 00 00 02 55 01];
+                qcom,gamma-25-cmds-dsi-state = "DSI_LP_MODE";
+        };
+};

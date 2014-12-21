@@ -266,4 +266,9 @@ config BT_WILINK
 
 	  Say Y here to compile support for Texas Instrument's WiLink7 driver
 	  into the kernel or say M to compile it as module.
+config HUAWEI_FM
+        tristate "FM searching params shell debug driver"
+        depends on HUAWEI_KERNEL
+        help
+        use huawei feature
 endmenu

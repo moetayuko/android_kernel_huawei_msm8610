@@ -117,6 +117,13 @@ static inline bool aca_enabled(void)
 #endif
 }
 
+#ifdef CONFIG_HUAWEI_KERNEL
+extern int ci13xxx_udc_register_vbus_sn(void (*callback)(int));
+extern void ci13xxx_udc_unregister_vbus_sn(void (*callback)(int));
+extern int ci13xxx_udc_get_enum_count(void);
+extern void ci13xxx_udc_set_enum_count(int count);
+#endif
+
 static int vdd_val[VDD_TYPE_MAX][VDD_VAL_MAX] = {
 		{  /* VDD_CX CORNER Voting */
 			[VDD_NONE]	= RPM_VREG_CORNER_NONE,
@@ -2560,6 +2567,12 @@ static void msm_otg_sm_work(struct work_struct *w)
 					}
 					/* fall through */
 				case USB_PROPRIETARY_CHARGER:
+#ifdef CONFIG_HUAWEI_KERNEL
+					if(ci13xxx_udc_get_enum_count())
+					{
+						ci13xxx_udc_set_enum_count(0);
+					}
+#endif
 					msm_otg_notify_charger(motg,
 							IDEV_CHG_MAX);
 					pm_runtime_put_sync(otg->phy->dev);
@@ -4560,7 +4573,12 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 	}
 
 	motg->usb_psy.name = "usb";
+	/* modfy inital value for power down charging */
+#ifdef CONFIG_HUAWEI_KERNEL
+	motg->usb_psy.type = POWER_SUPPLY_TYPE_UNKNOWN;
+#else
 	motg->usb_psy.type = POWER_SUPPLY_TYPE_USB;
+#endif
 	motg->usb_psy.supplied_to = otg_pm_power_supplied_to;
 	motg->usb_psy.num_supplicants = ARRAY_SIZE(otg_pm_power_supplied_to);
 	motg->usb_psy.properties = otg_pm_power_props_usb;
@@ -4579,7 +4597,9 @@ static int __init msm_otg_probe(struct platform_device *pdev)
 		if (!msm_otg_register_power_supply(pdev, motg))
 			psy = &motg->usb_psy;
 	}
-
+#ifdef CONFIG_HUAWEI_KERNEL
+	ci13xxx_udc_register_vbus_sn(&msm_otg_set_vbus_state);
+#endif
 	if (legacy_power_supply && pdata->otg_control == OTG_PMIC_CONTROL)
 		pm8921_charger_register_vbus_sn(&msm_otg_set_vbus_state);
 
@@ -4660,6 +4680,9 @@ static int __devexit msm_otg_remove(struct platform_device *pdev)
 		msm_otg_setup_devices(pdev, motg->pdata->mode, false);
 	if (motg->pdata->otg_control == OTG_PMIC_CONTROL)
 		pm8921_charger_unregister_vbus_sn(0);
+#ifdef CONFIG_HUAWEI_KERNEL
+	ci13xxx_udc_unregister_vbus_sn(0);
+#endif
 	msm_otg_mhl_register_callback(motg, NULL);
 	msm_otg_debugfs_cleanup();
 	cancel_delayed_work_sync(&motg->chg_work);

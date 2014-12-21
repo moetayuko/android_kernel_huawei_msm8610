@@ -32,6 +32,8 @@
 #include "synaptics_i2c_rmi4.h"
 #include <linux/input/mt.h>
 
+#include "huawei_tp_adapter.h"
+
 #define DRIVER_NAME "synaptics_rmi4_i2c"
 #define INPUT_PHYS_NAME "synaptics_rmi4_i2c/input0"
 #define DEBUGFS_DIR_NAME "ts_debug"
@@ -1401,6 +1403,7 @@ static int synaptics_rmi4_parse_dt(struct device *dev,
 	struct device_node *np = dev->of_node;
 	struct property *prop;
 	u32 temp_val, num_buttons;
+	u32 temp;
 	u32 button_map[MAX_NUMBER_OF_BUTTONS];
 	int rc, i;
 
@@ -1440,7 +1443,9 @@ static int synaptics_rmi4_parse_dt(struct device *dev,
 		dev_err(dev, "Unable to read fw image name\n");
 		return rc;
 	}
-
+	/*enable power gpio*/
+	rmi4_pdata->enable_power_gpio = of_get_named_gpio_flags(np,
+			"synaptics,enable-power-gpio", 0, &temp);
 	/* reset, irq gpio info */
 	rmi4_pdata->reset_gpio = of_get_named_gpio_flags(np,
 			"synaptics,reset-gpio", 0, &rmi4_pdata->reset_flags);
@@ -2711,6 +2716,37 @@ err_irq_gpio_dir:
 err_irq_gpio_req:
 	return retval;
 }
+static ssize_t
+synaptics_virtual_keys_register(struct kobject *kobj,
+			     struct kobj_attribute *attr,
+			     char *buf)
+{
+	return snprintf(buf, 200,
+		__stringify(EV_KEY) ":" __stringify(KEY_HOME)  ":270:1040:60:60"
+		":" __stringify(EV_KEY) ":" __stringify(KEY_MENU)   ":470:1040:60:60"
+		":" __stringify(EV_KEY) ":" __stringify(KEY_BACK) ":80:1040:60:60"
+		"\n");
+}
+
+static struct kobj_attribute synaptics_virtual_keys_attr = {
+	.attr = {
+		.name = "virtualkeys.synaptics_rmi4_i2c",
+		.mode = S_IRUGO,
+	},
+	.show = &synaptics_virtual_keys_register,
+};
+
+static struct attribute *synaptics_virtual_key_properties_attrs[] = {
+	&synaptics_virtual_keys_attr.attr,
+	NULL,
+};
+
+static struct attribute_group synaptics_virtual_key_properties_attr_group = {
+	.attrs = synaptics_virtual_key_properties_attrs,
+};
+
+
+struct kobject *synaptics_virtual_key_properties_kobj;
 
  /**
  * synaptics_rmi4_probe()
@@ -2741,6 +2777,19 @@ static int __devinit synaptics_rmi4_probe(struct i2c_client *client,
 			client->dev.platform_data;
 	struct dentry *temp;
 
+	if(touch_hw_data.read_touch_probe_flag)
+	{
+		retval = touch_hw_data.read_touch_probe_flag();
+		if(retval)
+		{
+	        dev_err(&client->dev, "%s:the touch driver has detected! \n",__func__);
+			return -EPERM;
+		}
+		else
+		{
+		    dev_info(&client->dev, "%s:it's the first touch driver!\n",__func__);
+		}
+	}
 	if (!i2c_check_functionality(client->adapter,
 			I2C_FUNC_SMBUS_BYTE_DATA)) {
 		dev_err(&client->dev,
@@ -2835,6 +2884,33 @@ static int __devinit synaptics_rmi4_probe(struct i2c_client *client,
 		dev_err(&client->dev, "Failed to configure regulators\n");
 		goto err_reg_configure;
 	}
+	if (gpio_is_valid(platform_data->enable_power_gpio)) {
+		/* configure touchscreen reset out gpio */
+		retval = gpio_request(platform_data->enable_power_gpio,
+				"rmi4_enable_power_gpio");
+		if (retval) {
+			dev_err(&client->dev, "unable to request gpio [%d]\n",
+						platform_data->enable_power_gpio);
+			return retval;
+		} else {
+			retval = gpio_tlmm_config(GPIO_CFG(platform_data->enable_power_gpio,0,
+				GPIO_CFG_OUTPUT,GPIO_CFG_NO_PULL,GPIO_CFG_2MA),GPIO_CFG_ENABLE);
+			if(retval < 0) {
+			    dev_err(&client->dev,"%s: Fail set gpio as no pull=%d\n",__func__,
+							platform_data->enable_power_gpio);
+				return retval;
+			}
+
+			retval = gpio_direction_output(platform_data->enable_power_gpio, 1);
+			if (retval) {
+				dev_err(&client->dev, "unable to set direction for gpio [%d]\n",
+					platform_data->enable_power_gpio);
+				return retval;
+			}
+
+		}
+
+	}
 
 	retval = synaptics_rmi4_power_on(rmi4_data, true);
 	if (retval < 0) {
@@ -2859,6 +2935,18 @@ static int __devinit synaptics_rmi4_probe(struct i2c_client *client,
 		goto err_free_gpios;
 	}
 
+<<<<<<< HEAD
+	synaptics_virtual_key_properties_kobj =
+			kobject_create_and_add("board_properties", NULL);
+
+	if (synaptics_virtual_key_properties_kobj)
+		retval = sysfs_create_group(synaptics_virtual_key_properties_kobj,
+				&synaptics_virtual_key_properties_attr_group);
+
+	if (!synaptics_virtual_key_properties_kobj || retval)
+		pr_err("%s: failed to create board_properties\n", __func__);
+
+=======
 	if (rmi4_data->board->disp_maxx)
 		rmi4_data->disp_maxx = rmi4_data->board->disp_maxx;
 	else
@@ -2878,13 +2966,19 @@ static int __devinit synaptics_rmi4_probe(struct i2c_client *client,
 		rmi4_data->disp_miny = rmi4_data->board->disp_miny;
 	else
 		rmi4_data->disp_miny = 0;
+>>>>>>> origin/platform/qcom/LNX.LA.3.2.1-02310-8x10.0_delta
 
 	input_set_abs_params(rmi4_data->input_dev,
 			ABS_MT_POSITION_X, rmi4_data->disp_minx,
 			rmi4_data->disp_maxx, 0, 0);
 	input_set_abs_params(rmi4_data->input_dev,
+<<<<<<< HEAD
+			ABS_MT_POSITION_Y, 0,
+			rmi4_data->sensor_max_y - 200, 0, 0);
+=======
 			ABS_MT_POSITION_Y, rmi4_data->disp_miny,
 			rmi4_data->disp_maxy, 0, 0);
+>>>>>>> origin/platform/qcom/LNX.LA.3.2.1-02310-8x10.0_delta
 	input_set_abs_params(rmi4_data->input_dev,
 			ABS_PRESSURE, 0, 255, 0, 0);
 #ifdef REPORT_2D_W
@@ -2956,6 +3050,10 @@ static int __devinit synaptics_rmi4_probe(struct i2c_client *client,
 				"%s: Failed to create irq thread\n",
 				__func__);
 		goto err_enable_irq;
+	}
+	if(touch_hw_data.set_touch_probe_flag)
+	{
+		touch_hw_data.set_touch_probe_flag(1);
 	}
 
 	rmi4_data->dir = debugfs_create_dir(DEBUGFS_DIR_NAME, NULL);

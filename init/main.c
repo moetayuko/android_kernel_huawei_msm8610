@@ -656,6 +656,14 @@ core_param(initcall_debug, initcall_debug, bool, 0644);
 
 static char msgbuf[64];
 
+#ifdef CONFIG_HW_PANIC_ON_DELAY_AT_INIT_N_REBOOT
+#define MAX_INIT_DELAY 6000
+void do_one_initcall_timercb(unsigned long data){
+	printk(KERN_ERR "init call timedout: %pF\n", (initcall_t) data);
+	panic("unexpectedly long time for init");
+}
+#endif
+
 static int __init_or_module do_one_initcall_debug(initcall_t fn)
 {
 	ktime_t calltime, delta, rettime;
@@ -679,6 +687,16 @@ int __init_or_module do_one_initcall(initcall_t fn)
 	int count = preempt_count();
 	int ret;
 
+#ifdef CONFIG_HW_PANIC_ON_DELAY_AT_INIT_N_REBOOT
+	int timer_rc = 0;
+	struct timer_list timer;
+
+	setup_timer(&timer, do_one_initcall_timercb, (unsigned long)fn);
+	timer_rc = mod_timer(&timer, jiffies + msecs_to_jiffies(MAX_INIT_DELAY));
+	if (timer_rc)
+		printk(KERN_ERR "Error adding initcall timer:%d\n", timer_rc);
+#endif
+
 	if (initcall_debug)
 		ret = do_one_initcall_debug(fn);
 	else
@@ -700,6 +718,11 @@ int __init_or_module do_one_initcall(initcall_t fn)
 	if (msgbuf[0]) {
 		printk("initcall %pF returned with %s\n", fn, msgbuf);
 	}
+
+#ifdef CONFIG_HW_PANIC_ON_DELAY_AT_INIT_N_REBOOT
+	if (timer_rc == 0) 
+		del_timer(&timer);
+#endif
 
 	return ret;
 }

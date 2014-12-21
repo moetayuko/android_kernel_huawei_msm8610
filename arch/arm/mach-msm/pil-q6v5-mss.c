@@ -130,6 +130,24 @@ static int modem_shutdown(const struct subsys_desc *subsys)
 	return 0;
 }
 
+#ifdef CONFIG_HUAWEI_KERNEL
+#define OEM_QMI	"libqmi_oem_main"
+
+static void restart_oem_qmi(void)
+{
+	struct task_struct *tsk = NULL;
+
+	for_each_process(tsk)
+	{
+		if (!strcmp(tsk->comm, OEM_QMI))
+		{
+			send_sig(SIGKILL, tsk, 0);
+			return;
+		}
+	}
+}
+#endif
+
 static int modem_powerup(const struct subsys_desc *subsys)
 {
 	struct modem_data *drv = subsys_to_drv(subsys);
@@ -150,6 +168,12 @@ static int modem_powerup(const struct subsys_desc *subsys)
 	ret = pil_boot(&drv->mba->desc);
 	if (ret)
 		pil_shutdown(&drv->q6->desc);
+
+#ifdef CONFIG_HUAWEI_KERNEL
+	/* Restart oemqmi so that comm. be resume if the mode crashed*/
+	restart_oem_qmi();
+#endif
+
 	return ret;
 }
 

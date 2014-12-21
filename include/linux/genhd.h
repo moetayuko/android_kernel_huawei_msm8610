@@ -56,7 +56,11 @@ enum {
 	UNIXWARE_PARTITION = 0x63,	/* Same as GNU_HURD and SCO Unix */
 };
 
+#ifndef CONFIG_HUAWEI_MMC
 #define DISK_MAX_PARTS			256
+#else
+#define DISK_MAX_PARTS			32
+#endif
 #define DISK_NAME_LEN			32
 
 #include <linux/major.h>

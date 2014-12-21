@@ -1,0 +1,50 @@
+#
+# accelerometer driver configuration
+#
+menuconfig INPUT_MISC_HW
+	bool "misc_hw"
+	depends on HUAWEI_KERNEL = y
+	default n 
+	help
+	  Say Y here, and a list of supported ACCELEROMETERs will be displayed.
+	  This option doesn't affect the kernel.
+
+#if INPUT_MISC_HW
+
+config HUAWEI_FEATURE_SENSORS_ACCELEROMETER_ST_LIS3XH
+	tristate "ST LIS3DH and LIS331DLH accelerometer"	
+	depends on HUAWEI_KERNEL
+	depends on I2C
+	default n
+	help
+	  Say Y here if you have the ST LIS3DH and LIS331DLH accelerometer.
+
+config HUAWEI_FEATURE_SENSORS_ACCELEROMETER_KX023
+	tristate "ROHM KX023 accelerometer"	
+	depends on HUAWEI_KERNEL
+	depends on I2C
+	default n
+	help
+	  Say Y here if you have the ROHM KX023 accelerometer.
+	  
+
+config HUAWEI_FEATURE_SENSORS_AKM8963
+	tristate "AK8963 compass support"
+	depends on HUAWEI_KERNEL
+	depends on I2C
+	default n
+	help
+	  If you say yes here you get support for Asahi Kasei's
+	  orientation sensor AK8963.
+
+config  HUAWEI_FEATURE_PROXIMITY_EVERLIGHT_APS_AVAGO_9930
+	depends on HUAWEI_KERNEL
+	default n
+	tristate "EVERLIGHT APS_AVAGO_9930 Proximity"
+	help
+	  Say Y here if you have a everlight aps-12d proximity.
+	  If unsure, say N.
+	  To compile this driver as a module, choose M here: the
+	  module will be called aps_avago_9930.
+
+#endif

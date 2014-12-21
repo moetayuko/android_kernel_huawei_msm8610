@@ -234,7 +234,7 @@
 	rpm-regulator-ldoa7 {
 		status = "okay";
 		pm8110_l7: regulator-l7 {
-			regulator-min-microvolt = <2050000>;
+			regulator-min-microvolt = <1800000>;
 			regulator-max-microvolt = <2050000>;
 			qcom,init-voltage = <2050000>;
 			status = "okay";

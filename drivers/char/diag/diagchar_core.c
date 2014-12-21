@@ -74,8 +74,13 @@ static unsigned int poolsize_write_struct = 10;/* Num of items in the mempool */
 static unsigned int max_clients = 15;
 static unsigned int threshold_client_limit = 30;
 /* This is the maximum number of pkt registrations supported at initialization*/
+#ifdef CONFIG_HUAWEI_KERNEL
+int diag_max_reg = 650;
+int diag_threshold_reg = 800;
+#else
 int diag_max_reg = 600;
 int diag_threshold_reg = 750;
+#endif
 
 /* Timer variables */
 static struct timer_list drain_timer;

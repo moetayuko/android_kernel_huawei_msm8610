@@ -1,0 +1,5 @@
+/include/ "tianma-hx8369a-4p5-fwvga-cmd.dtsi"
+/include/ "tianma-ili9806c-4p5-fwvga-video.dtsi"
+/include/ "boe-nt35512-4p5-fwvga-video.dtsi"
+/include/ "cmi-otm8018b-4p5-fwvga-video.dtsi"
+/include/ "default-lcd.dtsi"

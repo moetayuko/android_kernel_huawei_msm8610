@@ -315,6 +315,10 @@ static void pm_suspend_marker(char *annotation)
 		annotation, tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
 		tm.tm_hour, tm.tm_min, tm.tm_sec, ts.tv_nsec);
 }
+#ifdef CONFIG_HUAWEI_KERNEL
+/* Function declaration, exported from earlysuspend.c */
+void set_up_threshold(int screen_on);
+#endif
 
 /**
  * pm_suspend - Externally visible function for suspending the system.
@@ -327,6 +331,10 @@ int pm_suspend(suspend_state_t state)
 {
 	int error;
 
+#ifdef CONFIG_HUAWEI_KERNEL
+    /* Set up_threshold to DEF_FREQUENCY_UP_THRESHOLD when system is ready to suspend */
+    set_up_threshold(true);
+#endif
 	if (state <= PM_SUSPEND_ON || state >= PM_SUSPEND_MAX)
 		return -EINVAL;
 

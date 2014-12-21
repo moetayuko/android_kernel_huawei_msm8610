@@ -43,6 +43,7 @@
 /include/ "msm8610-smp2p.dtsi"
 /include/ "msm8610-bus.dtsi"
 /include/ "msm8610-mdss.dtsi"
+/* delete 1 line */
 
 &soc {
 	#address-cells = <1>;
@@ -510,7 +511,7 @@
                 qcom,master-id = <86>;
 	};
 
-	i2c@f9925000 { /* BLSP-1 QUP-3 */
+	i2c3: i2c@f9925000 { /* BLSP-1 QUP-3 */
 		cell-index = <0>;
 		compatible = "qcom,i2c-qup";
 		#address-cells = <1>;
@@ -519,7 +520,7 @@
 		reg = <0xf9925000 0x1000>;
 		interrupt-names = "qup_err_intr";
 		interrupts = <0 97 0>;
-		qcom,i2c-bus-freq = <100000>;
+		qcom,i2c-bus-freq = <400000>;
                 qcom,i2c-src-freq = <19200000>;
                 qcom,sda-gpio = <&msmgpio 10 0>;
                 qcom,scl-gpio = <&msmgpio 11 0>;
@@ -844,7 +845,7 @@
 				<55 512 3936000 393600>,
 				<55 512 3936000 393600>;
 	};
-
+	/* solve start up slowly issue */
         qcom,msm-rng@f9bff000 {
                 compatible = "qcom,msm-rng";
                 reg = <0xf9bff000 0x200>;
@@ -853,8 +854,8 @@
                 qcom,msm-bus,num-cases = <2>;
                 qcom,msm-bus,num-paths = <1>;
                 qcom,msm-bus,vectors-KBps =
-                                <1 618 0 0>,
-                                <1 618 0 800>;
+                                <54 618 0 0>,
+                                <54 618 0 800>;
         };
 
 	qcom,msm-rtb {

@@ -1,0 +1,10 @@
+config HUAWEI_POWERKEY_MONITOR
+	tristate "monitor power key press time"
+	depends on HUAWEI_KERNEL
+	default n
+	help
+	  print log to show user we press power key more than 6 senconds
+	  it is to find out the true phone crash events from panics&dumps by
+	  pressing power key more than 10s on phone with set-in battery
+
+	  say No, if panics&dumps do not occur when press power key more than 10s

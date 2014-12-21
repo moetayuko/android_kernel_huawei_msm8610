@@ -172,6 +172,13 @@ int32_t read_eeprom_memory(struct msm_eeprom_ctrl_t *e_ctrl)
 	emap = eb_info->eeprom_map;
 
 	for (j = 0; j < eb_info->num_blocks; j++) {
+		/*add for muti i2c slave*/
+		if (emap[j].slave_addr.valid_size) {
+			//e_ctrl->eboard_info->i2c_slaveaddr = emap[j].slave_addr.addr;
+			//e_ctrl->i2c_client.cci_client->sid = e_ctrl->eboard_info->i2c_slaveaddr >> 1;
+			e_ctrl->i2c_client.client->addr =emap[j].slave_addr.addr;
+
+		}
 		if (emap[j].page.valid_size) {
 			e_ctrl->i2c_client.addr_type = emap[j].page.addr_t;
 			rc = e_ctrl->i2c_client.i2c_func_tbl->i2c_write(
@@ -317,7 +324,8 @@ static int msm_eeprom_alloc_memory_map(struct msm_eeprom_ctrl_t *e_ctrl,
 				       struct device_node *of)
 {
 	int i, rc = 0;
-	char property[14];
+	/*change for muti i2c slave*/
+	char property[20];
 	uint32_t count = 6;
 	struct msm_eeprom_board_info *eb = e_ctrl->eboard_info;
 
@@ -337,6 +345,13 @@ static int msm_eeprom_alloc_memory_map(struct msm_eeprom_ctrl_t *e_ctrl,
 	}
 
 	for (i = 0; i < eb->num_blocks; i++) {
+		/*add for muti i2c slave*/
+		snprintf(property, 18, "qcom,slave_addr%d", i);
+		rc = of_property_read_u32_array(of, property,
+		(uint32_t *) &eb->eeprom_map[i].slave_addr, count);
+		if (rc < 0) {
+			pr_err("%s: slave_addr not needed\n", __func__);
+		}
 		snprintf(property, 12, "qcom,page%d", i);
 		rc = of_property_read_u32_array(of, property,
 			(uint32_t *) &eb->eeprom_map[i].page, count);

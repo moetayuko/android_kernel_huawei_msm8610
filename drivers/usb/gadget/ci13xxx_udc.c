@@ -83,6 +83,17 @@ module_param(streaming, uint, S_IRUGO | S_IWUSR);
 #define EP_PRIME_CHECK_DELAY	(jiffies + msecs_to_jiffies(1000))
 #define MAX_PRIME_CHECK_RETRY	3 /*Wait for 3sec for EP prime failure */
 
+#ifdef CONFIG_HUAWEI_KERNEL
+#define NON_STANDARD_CHARGER_TIMER_FREQ		(round_jiffies_relative(msecs_to_jiffies(3000)))
+#define NON_STANDARD_REENMU_TIMER_FREQ		(round_jiffies_relative(msecs_to_jiffies(1000)))
+#define ENUM_SUCCESS 1
+#define ENUM_FAIL    0
+#define NON_STANDARD_CHARGER_CURRENT                   500
+static uint g_enum_flag = 0;
+static int repeat_count = 0;
+static void (*notify_otg_state_func_ptr)(int);
+#endif
+
 /* ctrl register bank access */
 static DEFINE_SPINLOCK(udc_lock);
 
@@ -846,6 +857,124 @@ static int hw_usb_reset(void)
 
 	return 0;
 }
+
+#ifdef CONFIG_HUAWEI_KERNEL
+void ci13xxx_udc_set_enum_flag(void)
+{
+    g_enum_flag = 1;
+}
+
+void ci13xxx_udc_clr_enum_flag(void)
+{
+    g_enum_flag = 0;
+}
+
+int ci13xxx_udc_get_enum_count(void)
+{
+    return repeat_count;
+}
+EXPORT_SYMBOL_GPL(ci13xxx_udc_get_enum_count);
+
+
+void ci13xxx_udc_set_enum_count(int count)
+{
+    if(count < 0)
+    {
+         pr_err("%s: The input volue is invalid!\n",__func__);
+         return;
+    }
+    repeat_count = 0;
+}
+EXPORT_SYMBOL_GPL(ci13xxx_udc_set_enum_count);
+
+int ci13xxx_udc_register_vbus_sn(void (*callback)(int))
+{
+    pr_debug("%p\n", callback);
+    notify_otg_state_func_ptr = callback;
+    return 0;
+}
+EXPORT_SYMBOL_GPL(ci13xxx_udc_register_vbus_sn);
+
+/* this is passed to the hsusb via platform_data msm_otg_pdata */
+void ci13xxx_udc_unregister_vbus_sn(void (*callback)(int))
+{
+    pr_debug("%p\n", callback);
+    notify_otg_state_func_ptr = NULL;
+}
+EXPORT_SYMBOL_GPL(ci13xxx_udc_unregister_vbus_sn);
+
+static void notify_otg_of_the_reenum_event(int plugin)
+{
+    plugin = !!plugin;
+    if (notify_otg_state_func_ptr)
+    {
+       pr_debug("notifying otg\n");
+       (*notify_otg_state_func_ptr) (plugin);
+    }
+    else
+    {
+        pr_debug("unable to notify\n");
+    }
+}
+
+extern int is_usb_chg_exist(void);
+
+/* added for non_standard charger  */
+//extern void set_nonstand_charger_flag(void);
+
+#define REENUM_NUM 	0
+
+static void enum_delay_work_func(struct work_struct *work)
+{
+
+    struct delayed_work *dwork = to_delayed_work(work);
+    struct ci13xxx *udc = container_of(dwork,struct ci13xxx, enmu_delay_work);
+    struct usb_phy * otg_xciev = udc->transceiver;
+
+    if(g_enum_flag)
+    {
+         repeat_count = 0;
+         ci13xxx_udc_clr_enum_flag();
+         wake_unlock(&udc->non_standard_wake_lock);
+         return;
+    }
+
+    /* charger is non standard charger or slowly plug in AC/usb also run here ,
+      * if we clear enum flag  we should enum again  ,
+      * reenum six times if charger is not AC/usb ,
+      * will set non_standard flag , and set non_standard charger current 500mA */
+    if (repeat_count <= REENUM_NUM)
+    {
+         wake_lock(&udc->non_standard_wake_lock);
+         notify_otg_of_the_reenum_event(0);
+         schedule_delayed_work(&udc->re_enum_delay_work, NON_STANDARD_REENMU_TIMER_FREQ);
+    }
+    else
+    {
+         if(is_usb_chg_exist())
+         {
+              usb_phy_set_power(otg_xciev, NON_STANDARD_CHARGER_CURRENT);
+            //  set_nonstand_charger_flag();
+         }
+         else
+         {
+              notify_otg_of_the_reenum_event(0);
+         }
+         repeat_count = 0;
+         wake_unlock(&udc->non_standard_wake_lock);
+    }
+}
+
+static void re_enum_delay_work_func(struct work_struct *work)
+{
+    struct delayed_work *dwork = to_delayed_work(work);
+    struct ci13xxx *udc = container_of(dwork,struct ci13xxx, re_enum_delay_work);
+    /* delete USB charger judgement, if charger is USB already, return in enum_delay_work_func */
+    notify_otg_of_the_reenum_event(1);
+    repeat_count++;
+    wake_unlock(&udc->non_standard_wake_lock);
+}
+#endif
 
 /******************************************************************************
  * DBG block
@@ -3343,6 +3472,10 @@ static int ci13xxx_vbus_session(struct usb_gadget *_gadget, int is_active)
 			hw_device_reset(udc);
 			if (udc->softconnect)
 				hw_device_state(udc->ep0out.qh.dma);
+#ifdef CONFIG_HUAWEI_KERNEL
+			ci13xxx_udc_clr_enum_flag();
+			schedule_delayed_work(&udc->enmu_delay_work,NON_STANDARD_CHARGER_TIMER_FREQ);
+#endif
 		} else {
 			hw_device_state(0);
 			_gadget_stop_activity(&udc->gadget);
@@ -3676,6 +3809,9 @@ static irqreturn_t udc_irq(void)
 		if (USBi_UEI & intr)
 			isr_statistics.uei++;
 		if (USBi_UI  & intr) {
+#ifdef CONFIG_HUAWEI_KERNEL
+			ci13xxx_udc_set_enum_flag();
+#endif
 			isr_statistics.ui++;
 			isr_tr_complete_handler(udc);
 		}
@@ -3812,7 +3948,13 @@ static int udc_probe(struct ci13xxx_udc_driver *driver, struct device *dev,
 
 	pm_runtime_no_callbacks(&udc->gadget.dev);
 	pm_runtime_enable(&udc->gadget.dev);
-
+#ifdef CONFIG_HUAWEI_KERNEL
+	INIT_DELAYED_WORK(&udc->enmu_delay_work,
+							enum_delay_work_func);
+	INIT_DELAYED_WORK(&udc->re_enum_delay_work,
+					re_enum_delay_work_func);
+	wake_lock_init(&udc->non_standard_wake_lock, WAKE_LOCK_SUSPEND, "non_standard_charger");
+#endif 
 	if (register_trace_usb_daytona_invalid_access(dump_usb_info, NULL))
 		pr_err("Registering trace failed\n");
 

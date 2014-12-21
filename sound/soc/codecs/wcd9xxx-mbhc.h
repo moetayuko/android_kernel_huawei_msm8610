@@ -9,6 +9,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+/* merge qcom patch to solve the headset detect problem in FC baseline*/
 #ifndef __WCD9XXX_MBHC_H__
 #define __WCD9XXX_MBHC_H__
 
@@ -268,7 +269,6 @@ struct wcd9xxx_mbhc_cb {
 	void (*setup_int_rbias) (struct snd_soc_codec *, bool);
 	void (*pull_mb_to_vddio) (struct snd_soc_codec *, bool);
 };
-
 struct wcd9xxx_mbhc {
 	bool polling_active;
 	/* Delayed work to report long button press */
@@ -419,3 +419,4 @@ void *wcd9xxx_mbhc_cal_btn_det_mp(
 int wcd9xxx_mbhc_get_impedance(struct wcd9xxx_mbhc *mbhc, uint32_t *zl,
 			       uint32_t *zr);
 #endif /* __WCD9XXX_MBHC_H__ */
+

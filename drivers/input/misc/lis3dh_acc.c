@@ -67,6 +67,12 @@
 #include	<linux/input/lis3dh.h>
 #include	<linux/module.h>
 #include	<linux/regulator/consumer.h>
+#include <misc/app_info.h>
+#ifdef CONFIG_HUAWEI_HW_DEV_DCT
+#include <linux/hw_dev_dec.h>
+#endif
+#include	<linux/of.h>
+#include <linux/miscdevice.h>
 
 
 #define	DEBUG	1
@@ -247,88 +253,53 @@ struct lis3dh_acc_data {
 	u8 reg_addr;
 #endif
 };
+static short akmd_lis3dh_xyz[3] = { 0 }; //the value of this array is reported to hal & akmd
+/*don't need config regulator, we use ldo19 on 8x12*/
 
-struct sensor_regulator {
-	struct regulator *vreg;
-	const char *name;
-	u32	min_uV;
-	u32	max_uV;
-};
-
-struct sensor_regulator lis3dh_acc_vreg[] = {
-	{NULL, "vdd", 1700000, 3600000},
-	{NULL, "vddio", 1700000, 3600000},
-};
-
-static int lis3dh_acc_config_regulator(struct lis3dh_acc_data *acc, bool on)
+/****************************************************************************** 
+ * Function Configuration
+******************************************************************************/
+static int lis3dh_open(struct inode *inode, struct file *file)
 {
-	int rc = 0, i;
-	int num_reg = sizeof(lis3dh_acc_vreg) / sizeof(struct sensor_regulator);
-
-	if (on) {
-		for (i = 0; i < num_reg; i++) {
-			lis3dh_acc_vreg[i].vreg =
-				regulator_get(&acc->client->dev,
-				lis3dh_acc_vreg[i].name);
-			if (IS_ERR(lis3dh_acc_vreg[i].vreg)) {
-				rc = PTR_ERR(lis3dh_acc_vreg[i].vreg);
-				pr_err("%s:regulator get failed rc=%d\n",
-								__func__, rc);
-				lis3dh_acc_vreg[i].vreg = NULL;
-				goto error_vdd;
-			}
-
-			if (regulator_count_voltages(
-				lis3dh_acc_vreg[i].vreg) > 0) {
-				rc = regulator_set_voltage(
-					lis3dh_acc_vreg[i].vreg,
-					lis3dh_acc_vreg[i].min_uV,
-					lis3dh_acc_vreg[i].max_uV);
-				if (rc) {
-					pr_err("%s: set voltage failed rc=%d\n",
-					__func__, rc);
-					regulator_put(lis3dh_acc_vreg[i].vreg);
-					lis3dh_acc_vreg[i].vreg = NULL;
-					goto error_vdd;
-				}
-			}
-
-			rc = regulator_enable(lis3dh_acc_vreg[i].vreg);
-			if (rc) {
-				pr_err("%s: regulator_enable failed rc =%d\n",
-					__func__, rc);
-				if (regulator_count_voltages(
-					lis3dh_acc_vreg[i].vreg) > 0) {
-					regulator_set_voltage(
-						lis3dh_acc_vreg[i].vreg, 0,
-						lis3dh_acc_vreg[i].max_uV);
-				}
-				regulator_put(lis3dh_acc_vreg[i].vreg);
-				lis3dh_acc_vreg[i].vreg = NULL;
-				goto error_vdd;
-			}
-		}
-		return rc;
-	} else {
-		i = num_reg;
-	}
-
-error_vdd:
-	while (--i >= 0) {
-		if (!IS_ERR_OR_NULL(lis3dh_acc_vreg[i].vreg)) {
-			if (regulator_count_voltages(
-			lis3dh_acc_vreg[i].vreg) > 0) {
-				regulator_set_voltage(lis3dh_acc_vreg[i].vreg,
-						0, lis3dh_acc_vreg[i].max_uV);
-			}
-			regulator_disable(lis3dh_acc_vreg[i].vreg);
-			regulator_put(lis3dh_acc_vreg[i].vreg);
-			lis3dh_acc_vreg[i].vreg = NULL;
-		}
-	}
-	return rc;
+       printk("lis3dh_open\n");
+	return nonseekable_open(inode, file);
 }
+static int lis3dh_release(struct inode *inode, struct file *file)
+{
+       printk("lis3dh_release\n");
+	return 0;
+}
+static long lis3dh_ioctl(struct file *file, unsigned int cmd,
+		   unsigned long arg)
+{
+	void __user *argp = (void __user *)arg;
 
+	switch (cmd) {
+	case  ECS_IOCTL_READ_ACCEL_XYZ:
+	        if (copy_to_user(argp, &akmd_lis3dh_xyz, sizeof(akmd_lis3dh_xyz))) 
+		{
+			printk("copy_to_user failed.");
+			return -EFAULT;
+		}
+		break;
+
+	default:
+		break;
+	}
+       return 0;
+}
+static struct file_operations lis3dh_fops = {
+	.owner = THIS_MODULE,
+	.open = lis3dh_open,
+	.release = lis3dh_release,
+	.unlocked_ioctl = lis3dh_ioctl,
+};
+
+static struct miscdevice lis3dh_device = {
+	.minor = MISC_DYNAMIC_MINOR,
+	.name = "accel",
+	.fops = &lis3dh_fops,
+};
 static int lis3dh_acc_i2c_read(struct lis3dh_acc_data *acc,
 				u8 *buf, int len)
 {
@@ -501,9 +472,7 @@ static void lis3dh_acc_device_power_off(struct lis3dh_acc_data *acc)
 		disable_irq_nosync(acc->irq1);
 	if (acc->pdata->gpio_int2)
 		disable_irq_nosync(acc->irq2);
-
-	lis3dh_acc_config_regulator(acc, false);
-
+	/*don't need config regulator, use ldo19 on 8x12*/
 	if (acc->hw_initialized) {
 		if (acc->pdata->gpio_int1)
 			disable_irq_nosync(acc->irq1);
@@ -517,12 +486,7 @@ static int lis3dh_acc_device_power_on(struct lis3dh_acc_data *acc)
 {
 	int err = -1;
 
-	err = lis3dh_acc_config_regulator(acc, true);
-	if (err < 0) {
-		dev_err(&acc->client->dev,
-				"power_on failed: %d\n", err);
-		return err;
-	}
+	/*don't need config regulator, use ldo19 on 8x12*/
 
 	if (acc->pdata->gpio_int1 >= 0)
 		enable_irq(acc->irq1);
@@ -533,7 +497,9 @@ static int lis3dh_acc_device_power_on(struct lis3dh_acc_data *acc)
 
 	if (!acc->hw_initialized) {
 		err = lis3dh_acc_hw_init(acc);
-		if (acc->hw_working == 1 && err < 0) {
+		
+		if (err < 0) {
+		
 			lis3dh_acc_device_power_off(acc);
 			return err;
 		}
@@ -720,7 +686,7 @@ static int lis3dh_acc_register_write(struct lis3dh_acc_data *acc, u8 *buf,
 }
 
 static int lis3dh_acc_get_acceleration_data(struct lis3dh_acc_data *acc,
-		int *xyz)
+		short *xyz)
 {
 	int err = -1;
 	/* Data bytes from hardware xL, xH, yL, yH, zL, zH */
@@ -742,10 +708,13 @@ static int lis3dh_acc_get_acceleration_data(struct lis3dh_acc_data *acc,
 	hw_d[2] = hw_d[2] * acc->sensitivity;
 
 
-	xyz[0] = ((acc->pdata->negate_x) ? (-hw_d[acc->pdata->axis_map_x])
-		   : (hw_d[acc->pdata->axis_map_x]));
-	xyz[1] = ((acc->pdata->negate_y) ? (-hw_d[acc->pdata->axis_map_y])
+    
+    /* the chip location made x and y exchanged  */
+    /* y = -x, x = y */
+    xyz[0] = ((acc->pdata->negate_y) ? (-hw_d[acc->pdata->axis_map_y])
 		   : (hw_d[acc->pdata->axis_map_y]));
+	xyz[1] = -((acc->pdata->negate_x) ? (-hw_d[acc->pdata->axis_map_x])
+		   : (hw_d[acc->pdata->axis_map_x]));
 	xyz[2] = ((acc->pdata->negate_z) ? (-hw_d[acc->pdata->axis_map_z])
 		   : (hw_d[acc->pdata->axis_map_z]));
 
@@ -759,7 +728,7 @@ static int lis3dh_acc_get_acceleration_data(struct lis3dh_acc_data *acc,
 }
 
 static void lis3dh_acc_report_values(struct lis3dh_acc_data *acc,
-					int *xyz)
+					short *xyz)
 {
 	input_report_abs(acc->input_dev, ABS_X, xyz[0]);
 	input_report_abs(acc->input_dev, ABS_Y, xyz[1]);
@@ -786,8 +755,24 @@ static int lis3dh_acc_enable(struct lis3dh_acc_data *acc)
 
 static int lis3dh_acc_disable(struct lis3dh_acc_data *acc)
 {
+    if( NULL == acc )/* check input parameter */
+    {
+        printk( "%s error: acc is NULL!\n", __func__ );
+        return 0;
+    }
+	
 	if (atomic_cmpxchg(&acc->enabled, 1, 0)) {
-		cancel_delayed_work_sync(&acc->input_work);
+	
+        if( NULL == &acc->input_work )/* check parameter before call function */
+        {
+            printk( "%s error: acc->input_work is NULL!\n", __func__ );
+            return 0;
+        }
+        else
+        {
+            cancel_delayed_work_sync(&acc->input_work);
+        }
+		
 		lis3dh_acc_device_power_off(acc);
 	}
 
@@ -1093,25 +1078,25 @@ static ssize_t attr_addr_set(struct device *dev, struct device_attribute *attr,
 
 static struct device_attribute attributes[] = {
 
-	__ATTR(poll_delay, 0664, attr_get_polling_rate,
+	__ATTR(poll_delay, 0666, attr_get_polling_rate,
 			attr_set_polling_rate),
-	__ATTR(range, 0664, attr_get_range, attr_set_range),
-	__ATTR(enable, 0664, attr_get_enable, attr_set_enable),
-	__ATTR(int1_config, 0664, attr_get_intconfig1, attr_set_intconfig1),
-	__ATTR(int1_duration, 0664, attr_get_duration1, attr_set_duration1),
-	__ATTR(int1_threshold, 0664, attr_get_thresh1, attr_set_thresh1),
+	__ATTR(range, 0666, attr_get_range, attr_set_range),
+	__ATTR(enable, 0666, attr_get_enable, attr_set_enable),
+	__ATTR(int1_config, 0666, attr_get_intconfig1, attr_set_intconfig1),
+	__ATTR(int1_duration, 0666, attr_get_duration1, attr_set_duration1),
+	__ATTR(int1_threshold, 0666, attr_get_thresh1, attr_set_thresh1),
 	__ATTR(int1_source, 0444, attr_get_source1, NULL),
-	__ATTR(click_config, 0664, attr_get_click_cfg, attr_set_click_cfg),
+	__ATTR(click_config, 0666, attr_get_click_cfg, attr_set_click_cfg),
 	__ATTR(click_source, 0444, attr_get_click_source, NULL),
-	__ATTR(click_threshold, 0664, attr_get_click_ths, attr_set_click_ths),
-	__ATTR(click_timelimit, 0664, attr_get_click_tlim,
+	__ATTR(click_threshold, 0666, attr_get_click_ths, attr_set_click_ths),
+	__ATTR(click_timelimit, 0666, attr_get_click_tlim,
 			attr_set_click_tlim),
-	__ATTR(click_timelatency, 0664, attr_get_click_tlat,
+	__ATTR(click_timelatency, 0666, attr_get_click_tlat,
 							attr_set_click_tlat),
-	__ATTR(click_timewindow, 0664, attr_get_click_tw, attr_set_click_tw),
+	__ATTR(click_timewindow, 0666, attr_get_click_tw, attr_set_click_tw),
 
 #ifdef DEBUG
-	__ATTR(reg_value, 0664, attr_reg_get, attr_reg_set),
+	__ATTR(reg_value, 0666, attr_reg_get, attr_reg_set),
 	__ATTR(reg_addr, 0220, NULL, attr_addr_set),
 #endif
 };
@@ -1146,19 +1131,17 @@ static void lis3dh_acc_input_work_func(struct work_struct *work)
 {
 	struct lis3dh_acc_data *acc;
 
-	int xyz[3] = { 0 };
+	
 	int err;
 
 	acc = container_of((struct delayed_work *)work,
 			struct lis3dh_acc_data,	input_work);
-
 	mutex_lock(&acc->lock);
-	err = lis3dh_acc_get_acceleration_data(acc, xyz);
+	err = lis3dh_acc_get_acceleration_data(acc, akmd_lis3dh_xyz);
 	if (err < 0)
 		dev_err(&acc->client->dev, "get_acceleration_data failed\n");
 	else
-		lis3dh_acc_report_values(acc, xyz);
-
+		lis3dh_acc_report_values(acc, akmd_lis3dh_xyz);
 	schedule_delayed_work(&acc->input_work, msecs_to_jiffies(
 			acc->pdata->poll_interval));
 	mutex_unlock(&acc->lock);
@@ -1269,6 +1252,128 @@ static void lis3dh_acc_input_cleanup(struct lis3dh_acc_data *acc)
 	input_free_device(acc->input_dev);
 }
 
+static int lis3dh_parse_dt(struct device *dev,
+				struct lis3dh_acc_platform_data *lis3dh_pdata)
+{
+	struct device_node *np = dev->of_node;
+	u32 temp_val;
+	int rc;
+
+	rc = of_property_read_u32(np, "lis3dh,min_interval", &temp_val);
+	if (rc && (rc != -EINVAL)) {
+		dev_err(dev, "Unable to read min_interval\n");
+		return rc;
+	} else {
+		lis3dh_pdata->min_interval = (int)temp_val;
+		printk("GGG lis3dh_pdata->min_interval is %d\n", lis3dh_pdata->min_interval);
+	}
+
+	rc = of_property_read_u32(np, "lis3dh,poll_interval", &temp_val);
+	if (rc && (rc != -EINVAL)) {
+		dev_err(dev, "Unable to read poll_interval\n");
+		return rc;
+	} else {
+		lis3dh_pdata->poll_interval = (int)temp_val;
+		printk("GGG lis3dh_pdata->poll_interval is %d\n", lis3dh_pdata->poll_interval);
+	}
+
+	rc = of_property_read_u32(np, "lis3dh,axis_map_x", &temp_val);
+	if (rc && (rc != -EINVAL)) {
+		dev_err(dev, "Unable to read axis_map_x\n");
+		return rc;
+	} else {
+		lis3dh_pdata->axis_map_x = (u8)temp_val;
+	}
+
+	rc = of_property_read_u32(np, "lis3dh,axis_map_y", &temp_val);
+	if (rc && (rc != -EINVAL)) {
+		dev_err(dev, "Unable to read axis_map_y\n");
+		return rc;
+	} else {
+		lis3dh_pdata->axis_map_y = (u8)temp_val;
+	}
+
+	rc = of_property_read_u32(np, "lis3dh,axis_map_z", &temp_val);
+	if (rc && (rc != -EINVAL)) {
+		dev_err(dev, "Unable to read axis_map_z\n");
+		return rc;
+	} else {
+		lis3dh_pdata->axis_map_z = (u8)temp_val;
+	}
+
+	rc = of_property_read_u32(np, "lis3dh,g_range", &temp_val);
+	if (rc && (rc != -EINVAL)) {
+		dev_err(dev, "Unable to read g_range\n");
+		return rc;
+	} else {
+		switch (temp_val) {
+		case 2:
+			lis3dh_pdata->g_range = LIS3DH_ACC_G_2G;
+			break;
+		case 4:
+			lis3dh_pdata->g_range = LIS3DH_ACC_G_4G;
+			break;
+		case 8:
+			lis3dh_pdata->g_range = LIS3DH_ACC_G_8G;
+			break;
+		default:
+			lis3dh_pdata->g_range = LIS3DH_ACC_G_2G;
+			break;
+		}
+	}
+
+	rc = of_property_read_u32(np, "lis3dh,negate_x", &temp_val);
+	if (rc && (rc != -EINVAL)) {
+		dev_err(dev, "Unable to read negate_x\n");
+		return rc;
+	} else {
+		lis3dh_pdata->negate_x = (u8)temp_val;
+	}
+
+	rc = of_property_read_u32(np, "lis3dh,negate_y", &temp_val);
+	if (rc && (rc != -EINVAL)) {
+		dev_err(dev, "Unable to read negate_y\n");
+		return rc;
+	} else {
+		lis3dh_pdata->negate_y = (u8)temp_val;
+	}
+
+	rc = of_property_read_u32(np, "lis3dh,negate_z", &temp_val);
+	if (rc && (rc != -EINVAL)) {
+		dev_err(dev, "Unable to read negate_z\n");
+		return rc;
+	} else {
+		lis3dh_pdata->negate_z = (u8)temp_val;
+	}
+
+	lis3dh_pdata->init = NULL;
+	lis3dh_pdata->exit = NULL;
+	lis3dh_pdata->gpio_int1 = -EINVAL;
+	lis3dh_pdata->gpio_int2 = -EINVAL;
+
+	return 0;
+}
+
+/**
+ * lis3dh_get_device_id - get the device's board id
+ * @acc: Handle to device data struct
+ * 
+ * read device id register, returning device id 
+ * or a error number
+ */
+static s32 lis3dh_get_device_id(struct lis3dh_acc_data * acc)
+{
+	s32 who_am_i = -EINVAL;
+
+    if (NULL == acc)
+    {
+        return -EINVAL;
+    }
+    
+	who_am_i = i2c_smbus_read_byte_data(acc->client, WHO_AM_I);
+
+	return who_am_i;
+}
 static int lis3dh_acc_probe(struct i2c_client *client,
 		const struct i2c_device_id *id)
 {
@@ -1276,15 +1381,16 @@ static int lis3dh_acc_probe(struct i2c_client *client,
 	struct lis3dh_acc_data *acc;
 
 	int err = -1;
+	s32 device_id = -EINVAL;
 
 	pr_info("%s: probe start.\n", LIS3DH_ACC_DEV_NAME);
-
+/*
 	if (client->dev.platform_data == NULL) {
 		dev_err(&client->dev, "platform data is NULL. exiting.\n");
 		err = -ENODEV;
 		goto exit_check_functionality_failed;
 	}
-
+*/
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
 		dev_err(&client->dev, "client not i2c capable\n");
 		err = -ENODEV;
@@ -1326,7 +1432,8 @@ static int lis3dh_acc_probe(struct i2c_client *client,
 	acc->client = client;
 	i2c_set_clientdata(client, acc);
 
-	acc->pdata = kmalloc(sizeof(*acc->pdata), GFP_KERNEL);
+	//acc->pdata = kmalloc(sizeof(*acc->pdata), GFP_KERNEL);
+	acc->pdata = kzalloc(sizeof(struct lis3dh_acc_platform_data), GFP_KERNEL);
 	if (acc->pdata == NULL) {
 		err = -ENOMEM;
 		dev_err(&client->dev,
@@ -1335,7 +1442,16 @@ static int lis3dh_acc_probe(struct i2c_client *client,
 		goto err_mutexunlock;
 	}
 
-	memcpy(acc->pdata, client->dev.platform_data, sizeof(*acc->pdata));
+	//memcpy(acc->pdata, client->dev.platform_data, sizeof(*acc->pdata));
+	if (client->dev.of_node) {
+		memset(acc->pdata, 0 , sizeof(struct lis3dh_acc_platform_data));
+		err = lis3dh_parse_dt(&client->dev, acc->pdata);
+		if (err) {
+			dev_err(&client->dev,
+				"Unable to parse platfrom data err=%d\n", err);
+			return err;
+		}
+	}
 
 	err = lis3dh_acc_validate_pdata(acc);
 	if (err < 0) {
@@ -1397,6 +1513,38 @@ static int lis3dh_acc_probe(struct i2c_client *client,
 		goto err_pdata_init;
 	}
 
+	device_id = lis3dh_get_device_id(acc);/*get device id*/
+	if (device_id < 0)/* read register failed */
+	{
+		dev_err(&client->dev, "%s %d:lis3dh device id read failed\n", __func__, __LINE__);
+		
+        err = -ENOMEM;
+		
+        goto err_pdata_init;
+	}
+#ifdef CONFIG_HUAWEI_HW_DEV_DCT
+	set_hw_dev_flag(DEV_I2C_G_SENSOR);
+#endif
+    dev_info(&client->dev, "%s %d:driver id:%d,device id:%d\n", 
+                __func__, __LINE__, WHOAMI_LIS3DH_ACC, device_id);
+	if (WHOAMI_LIS3DH_ACC == device_id)/* judge if the device id match this driver */
+	{
+		dev_err(&client->dev, "%s %d:driver and device matched!\n", __func__, __LINE__);
+		err = app_info_set("G-Sensor", LIS3DH_ACC_DEV_NAME);
+		if (err < 0)/*failed to add app_info*/
+		{
+            dev_err(&client->dev, "%s %d:faile to add app_info\n", __func__, __LINE__);
+		}
+	}
+	else
+	{
+		dev_err(&client->dev, "%s %d:driver and device not match!\n", __func__, __LINE__);
+		
+        err = -ENOMEM;
+		
+		goto err_pdata_init;
+	}
+	
 	atomic_set(&acc->enabled, 1);
 
 	err = lis3dh_acc_update_g_range(acc, acc->pdata->g_range);
@@ -1424,7 +1572,13 @@ static int lis3dh_acc_probe(struct i2c_client *client,
 		   "device LIS3DH_ACC_DEV_NAME sysfs register failed\n");
 		goto err_input_cleanup;
 	}
-
+	err = misc_register(&lis3dh_device);
+	if (err) {
+		printk(KERN_ERR "lis3dh_probe: "
+			   "lis3dh_device register failed\n");
+		goto err_remove_sysfs_int;
+	}
+	
 	lis3dh_acc_device_power_off(acc);
 
 	/* As default, do not report information */
@@ -1521,6 +1675,7 @@ static int __devexit lis3dh_acc_remove(struct i2c_client *client)
 
 	lis3dh_acc_input_cleanup(acc);
 	lis3dh_acc_device_power_off(acc);
+	misc_deregister(&lis3dh_device);
 	remove_sysfs_interfaces(&client->dev);
 
 	if (acc->pdata->exit)
@@ -1558,10 +1713,20 @@ static const struct i2c_device_id lis3dh_acc_id[]
 
 MODULE_DEVICE_TABLE(i2c, lis3dh_acc_id);
 
+#ifdef CONFIG_OF
+static struct of_device_id lis3dh_match_table[] = {
+        { .compatible = "ST Micro,lis3dh_acc",},
+        { },
+};
+#else
+#define lis3dh_match_table NULL
+#endif
+
 static struct i2c_driver lis3dh_acc_driver = {
 	.driver = {
 			.owner = THIS_MODULE,
 			.name = LIS3DH_ACC_DEV_NAME,
+			.of_match_table = lis3dh_match_table,
 		  },
 	.probe = lis3dh_acc_probe,
 	.remove = __devexit_p(lis3dh_acc_remove),

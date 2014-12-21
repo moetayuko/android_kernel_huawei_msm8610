@@ -490,6 +490,9 @@ int mmc_send_status(struct mmc_card *card, u32 *status)
 
 	return 0;
 }
+#ifdef CONFIG_HW_MMC_TEST
+EXPORT_SYMBOL_GPL(mmc_send_status);
+#endif
 
 static int
 mmc_send_bus_test(struct mmc_card *card, struct mmc_host *host, u8 opcode,
@@ -598,11 +601,25 @@ int mmc_send_hpi_cmd(struct mmc_card *card, u32 *status)
 	unsigned int opcode;
 	int err;
 
+#ifdef CONFIG_HUAWEI_KERNEL 
+	if ((!card->ext_csd.hpi_en)&&(!card->ext_csd.hpi_bkops_en)) {
+		pr_warning("%s: Card didn't support HPI command\n",
+			   mmc_hostname(card->host));
+		return -EINVAL;
+	}
+    if(card->ext_csd.hpi_bkops_en)
+        pr_debug("%s: only HPI+BKOPS enalbed\n",mmc_hostname(card->host));
+
+    if(card->ext_csd.hpi_en)
+        pr_debug("%s: HPI enalbed\n",mmc_hostname(card->host));
+#else
 	if (!card->ext_csd.hpi_en) {
 		pr_warning("%s: Card didn't support HPI command\n",
 			   mmc_hostname(card->host));
 		return -EINVAL;
 	}
+
+#endif
 
 	opcode = card->ext_csd.hpi_cmd;
 	if (opcode == MMC_STOP_TRANSMISSION)

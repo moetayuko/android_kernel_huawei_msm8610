@@ -27,37 +27,7 @@
  */
 
 &soc {
-	i2c@f9923000{
-		focaltech@38{
-			compatible = "focaltech,5x06";
-			reg = <0x38>;
-			interrupt-parent = <&msmgpio>;
-			interrupts = <1 0x2>;
-			vdd-supply = <&pm8110_l19>;
-			vcc_i2c-supply = <&pm8110_l14>;
-			focaltech,name = "ft6x06";
-			focaltech,family-id = <0x06>;
-			focaltech,reset-gpio = <&msmgpio 0 0x00>;
-			focaltech,irq-gpio = <&msmgpio 1 0x00>;
-			focaltech,display-coords = <0 0 480 800>;
-			focaltech,panel-coords = <0 0 480 800>;
-			focaltech,button-map= <139 102 158>;
-			focaltech,no-force-update;
-			focaltech,i2c-pull-up;
-			focaltech,group-id = <1>;
-			focaltech,hard-reset-delay-ms = <20>;
-			focaltech,soft-reset-delay-ms = <150>;
-			focaltech,num-max-touches = <2>;
-			focaltech,fw-name = "ft_8610_qrd_fw.bin";
-			focaltech,fw-delay-aa-ms = <100>;
-			focaltech,fw-delay-55-ms = <30>;
-			focaltech,fw-upgrade-id1 = <0x79>;
-			focaltech,fw-upgrade-id2 = <0x08>;
-			focaltech,fw-delay-readid-ms = <10>;
-			focaltech,fw-delay-era-flsh-ms = <2000>;
-		};
-	};
-
+/*move the tp config to separate dtsi*/
 	gen-vkeys {
 		compatible = "qcom,gen-vkeys";
 		label = "ft5x06_ts";
@@ -71,31 +41,15 @@
 	serial@f991e000 {
 		status = "ok";
 	};
+	/*move sensors device tree to it's self file*/
+	/* delete the code which used to define tmd27713 */
+	/* those code made tmd27723 work wrong and we do not us tmd27713 */
 
-	i2c@f9925000 { /* BLSP-1 QUP-3 */
-		kionix@f {
-			compatible = "kionix,kxtj9";
-			reg = <0x0f>;
-			interrupt-parent = <&msmgpio>;
-			interrupts = <81 0x2>;
-			vdd-supply = <&pm8110_l19>;
-			vio-supply = <&pm8110_l14>;
-			kionix,min-interval = <5>;
-			kionix,init-interval = <200>;
-			kionix,axis-map-x = <1>;
-			kionix,axis-map-y = <0>;
-			kionix,axis-map-z = <2>;
-			kionix,g-range = <2>;
-			kionix,negate-x;
-			kionix,negate-y;
-			kionix,negate-z;
-			kionix,res-12bit;
-		};
-	};
 
+	
 	flashlight {
 		compatible = "qcom,leds-gpio-flash";
-		status = "okay";
+		status = "disabled";
 		qcom,flash-en = <&msmgpio 18 0>;
 		qcom,flash-now = <&msmgpio 19 0>;
 		linux,name = "flashlight";
@@ -134,11 +88,12 @@
                         linux,input-type = <1>;
                         linux,code = <115>;
                         gpio-key,wakeup;
-                        debounce-interval = <15>;
+			debounce-interval = <20>;
 		};
 	};
 
     sound {
+
 	qcom,audio-routing =
 		"RX_BIAS", "MCLK",
 		"INT_LDO_H", "MCLK",
@@ -146,10 +101,10 @@
 		"MIC BIAS Internal2", "Headset Mic",
 		"AMIC1", "MIC BIAS Internal1",
 		"AMIC2", "MIC BIAS Internal2";
-	qcom,mbhc-bias-internal;
+/* use external mode micbias, so delete the internal config */
     };
 };
-
+/*change micbias value from 2700 to 1800*/
 &i2c_cdc  {
 	msm8x10_wcd_codec@0d{
 		compatible = "qcom,msm8x10-wcd-i2c";
@@ -157,7 +112,7 @@
 
 		interrupt-parent = <&wcd9xxx_intc>;
 		interrupts = <0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
-			     17 18 19 20 21 22 23>;
+						17 18 19 20 21 22 23>;
 
 		cdc-vdda-cp-supply = <&pm8110_s4>;
 		qcom,cdc-vdda-cp-voltage = <1800000 2150000>;
@@ -181,7 +136,7 @@
 
 		qcom,cdc-micbias-ldoh-v = <0x3>;
 		qcom,cdc-micbias-cfilt-sel = <0x0>;
-		qcom,cdc-micbias-cfilt-mv = <2700>;
+		qcom,cdc-micbias-cfilt-mv = <1800>;
 		qcom,cdc-mclk-clk-rate = <12288000>;
 
 		qcom,cdc-static-supplies = "cdc-vdda-h",
@@ -207,7 +162,6 @@
 		reg = <0x55>;
 	};
 };
-
 &spmi_bus {
 	qcom,pm8110@0 {
 		qcom,leds@a100 {
@@ -216,7 +170,7 @@
 				label = "mpp";
 				linux,name = "button-backlight";
 				linux,default-trigger = "hr-trigger";
-				qcom,current-setting = <20>;
+				qcom,current-setting = <5>;
 				qcom,default-state = "off";
 				qcom,max-current = <40>;
 				qcom,id = <6>;
@@ -246,18 +200,10 @@
 	};
 };
 
-&spmi_bus {
-	qcom,pm8110@1 {
-		qcom,vibrator@c000 {
-			status = "okay";
-			qcom,vib-timeout-ms = <15000>;
-			qcom,vib-vtg-level-mV = <3100>;
-		};
-	};
-};
-
+/*move vibrator node to independency file*/
 &sdhc_1 {
 	vdd-supply = <&pm8110_l17>;
+	qcom,vdd-always-on;        
 	qcom,vdd-voltage-level = <2900000 2900000>;
 	qcom,vdd-current-level = <200 400000>;
 
@@ -271,8 +217,11 @@
 	qcom,pad-drv-on = <0x4 0x4 0x4>; /* 10mA, 10mA, 10mA */
 	qcom,pad-drv-off = <0x0 0x0 0x0>; /* 2mA, 2mA, 2mA */
 
-	qcom,clk-rates = <400000 25000000 50000000 100000000 200000000>;
-	qcom,bus-speed-mode = "HS200_1p8v", "DDR_1p8v";
+	/*change the emmc max frequency from 200Mhz to 50Mhz*/
+	qcom,clk-rates = <400000 25000000 50000000>;
+
+	/*delete the feature of HS200 high speed mode because the clk depress to 50Mhz*/
+	qcom,bus-speed-mode = "DDR_1p8v";
 	qcom,nonremovable;
 
 	status = "ok";
@@ -284,6 +233,8 @@
 	qcom,vdd-current-level = <15000 400000>;
 
 	vdd-io-supply = <&pm8110_l21>;
+	/*Do not always turn on L21 power supply*/
+	qcom,vdd-io-lpm-sup;
 	qcom,vdd-io-voltage-level = <1800000 2950000>;
 	qcom,vdd-io-current-level = <200 50000>;
 
@@ -372,9 +323,26 @@
 
 &android_usb {
 	qcom,android-usb-cdrom;
-	qcom,android-usb-internal-ums;
+};
+
+/ {
+        qrd_batterydata: qcom,battery-data {
+                qcom,rpull-up-kohm = <68>;
+                qcom,vref-batt-therm = <1800000>;
+                //remove qcom's battery data
+        };
 };
 
 &mdss_mdp {
 	batfet-supply = <&pm8110_chg_batif>;
 };
+
+&pm8110_bms {
+        status = "ok";
+        qcom,battery-data = <&qrd_batterydata>;
+};
+
+&pm8110_chg {
+        qcom,battery-data = <&qrd_batterydata>;
+};
+

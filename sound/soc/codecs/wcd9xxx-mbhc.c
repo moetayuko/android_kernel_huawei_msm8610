@@ -9,6 +9,18 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
+ //merge the headset detect code from es4 baseline
+/* merge qcom patch to solve the headset detect problem in FC baseline*/
+#ifdef CONFIG_HUAWEI_KERNEL
+/* Open debug log for development version, will be closed after TR5 */
+#ifdef CONFIG_DYNAMIC_DEBUG
+#undef CONFIG_DYNAMIC_DEBUG
+#endif
+#ifndef DEBUG
+#define DEBUG
+#endif
+#endif
+
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/firmware.h>
@@ -98,8 +110,12 @@
  * Invalid voltage range for the detection
  * of plug type with current source
  */
-#define WCD9XXX_CS_MEAS_INVALD_RANGE_LOW_MV 110
-#define WCD9XXX_CS_MEAS_INVALD_RANGE_HIGH_MV 265
+ /* change invalid range from 110~265 to 3110~3265,
+  * means not use invalid range,because cannot get 
+  * value in the range when detect headset type
+  */
+#define WCD9XXX_CS_MEAS_INVALD_RANGE_LOW_MV 3110
+#define WCD9XXX_CS_MEAS_INVALD_RANGE_HIGH_MV 3265
 
 /*
  * Threshold used to detect euro headset
@@ -1044,7 +1060,10 @@ static s32 __wcd9xxx_codec_sta_dce_v(struct wcd9xxx_mbhc *mbhc, s8 dce,
 		mb = (mbhc->mbhc_data.sta_mb);
 		mv = (value - z) * (s32)micb_mv / (mb - z);
 	}
-
+#ifdef CONFIG_HUAWEI_KERNEL
+    pr_debug("%s: dce=%d, bias_value=%d, value=%d, z=%d, mb=%d, mv=%d", 
+        __func__, dce, bias_value, value, z, mb, mv);
+#endif
 	return mv;
 }
 

@@ -24,6 +24,7 @@
 #include "mdp3_ctrl.h"
 #include "mdp3.h"
 #include "mdp3_ppp.h"
+#include <linux/hw_lcd_common.h>
 
 #define MDP_CORE_CLK_RATE	100000000
 #define MDP_VSYNC_CLK_RATE	19200000
@@ -401,6 +402,7 @@ static int mdp3_ctrl_dma_init(struct msm_fb_data_type *mfd,
 	return rc;
 }
 
+/* rollback to qcom fc baseline original code */
 static int mdp3_ctrl_on(struct msm_fb_data_type *mfd)
 {
 	int rc = 0;

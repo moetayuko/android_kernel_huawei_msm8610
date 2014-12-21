@@ -1,0 +1,18 @@
+/ {
+        qrd_batterydata: qcom,battery-data {
+                /include/ "HB4742A0RBW_LG-4v35-2400mah.dtsi"
+                /include/ "HB4742A0RBW_SCUD-4v35-2400mah.dtsi"
+        };
+};
+
+&pm8110_bms {
+	qcom,battery-data = <&qrd_batterydata>;
+};
+
+&pm8110_chg {
+	status = "okay";
+	qcom,vddmax-mv = <4350>;
+	qcom,vddsafe-mv = <4380>;
+	qcom,tchg-mins = <360>;
+	qcom,battery-data = <&qrd_batterydata>;
+};

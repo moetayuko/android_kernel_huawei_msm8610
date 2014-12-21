@@ -1789,7 +1789,9 @@ splash_on_err:
 static int mdp3_panel_register_done(struct mdss_panel_data *pdata)
 {
 	int rc = 0;
-
+    
+	/*open splash lcd function*/
+	pdata->panel_info.cont_splash_enabled = 1;
 	if (pdata->panel_info.cont_splash_enabled) {
 		if (!mdp3_is_display_on(pdata)) {
 			pr_err("continuous splash, but bootloader is not\n");

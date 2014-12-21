@@ -16,7 +16,7 @@
 
 #include <linux/platform_device.h>
 #include <linux/types.h>
-
+#include <linux/msm_mdp.h>
 /* panel id type */
 struct panel_id {
 	u16 id;
@@ -299,6 +299,12 @@ struct mdss_panel_info {
 	struct ion_handle *splash_ihdl;
 	u32 panel_power_on;
 
+
+	/* Add two parameter */
+	const char *panel_name;
+	u32 bias_ic_enable;
+	u32 delaytime_before_bl;
+
 	uint32_t panel_dead;
 
 	struct lcd_panel_info lcdc;
@@ -327,6 +333,12 @@ struct mdss_panel_data {
 	int (*event_handler) (struct mdss_panel_data *pdata, int e, void *arg);
 
 	struct mdss_panel_data *next;
+#ifdef CONFIG_FB_AUTO_CABC
+    /* used to config cabc in terms of para:cabc_cfg*/
+    int (*config_cabc) (struct mdss_panel_data *pdata,struct msmfb_cabc_config cabc_cfg);
+#endif
+	/* Delete code that we don't use */
+
 };
 
 /**

@@ -28,11 +28,23 @@
 #include <linux/workqueue.h>
 #include <linux/slab.h>
 
+#ifdef CONFIG_HUAWEI_KERNEL
+#include <linux/notifier.h>
+#include <linux/fb.h>
+struct notifier_block fb_notify;
+#endif
+
 /*
  * dbs is used in this file as a shortform for demandbased switching
  * It helps to keep variable names smaller, simpler
  */
 
+#ifdef CONFIG_HUAWEI_KERNEL
+#define DEF_LPSPEED_COUNT_THRESHOLD			(5)
+#define DEF_FREQUENCY_UP_THRESHOLD_STRING		"80"
+#define MICRO_FREQUENCY_UP_THRESHOLD_STRING		"95"
+#define MIN_LPSPEED_COUNT_THRESHOLD			(0)
+#endif
 #define DEF_FREQUENCY_DOWN_DIFFERENTIAL		(10)
 #define DEF_FREQUENCY_UP_THRESHOLD		(80)
 #define DEF_SAMPLING_DOWN_FACTOR		(1)
@@ -57,6 +69,9 @@
 #define MIN_SAMPLING_RATE_RATIO			(2)
 
 static unsigned int min_sampling_rate;
+#ifdef CONFIG_HUAWEI_KERNEL
+static unsigned int lpspeed_count = 0;
+#endif
 
 #define LATENCY_MULTIPLIER			(1000)
 #define MIN_LATENCY_MULTIPLIER			(100)
@@ -144,6 +159,15 @@ static struct dbs_tuners {
 	unsigned int sampling_down_factor;
 	int          powersave_bias;
 	unsigned int io_is_busy;
+#ifdef CONFIG_HUAWEI_KERNEL
+	unsigned int input_freq;
+	unsigned int hispeed_freq;
+	unsigned int lpspeed_freq;
+	unsigned int lpspeed_count_threshold;
+	unsigned int lpspeed_enabled;
+	unsigned int restrict_freq;
+	unsigned int restrict_enabled;
+#endif
 	unsigned int input_boost;
 } dbs_tuners_ins = {
 	.up_threshold_multi_core = DEF_FREQUENCY_UP_THRESHOLD,
@@ -152,6 +176,11 @@ static struct dbs_tuners {
 	.down_differential = DEF_FREQUENCY_DOWN_DIFFERENTIAL,
 	.down_differential_multi_core = MICRO_FREQUENCY_DOWN_DIFFERENTIAL,
 	.up_threshold_any_cpu_load = DEF_FREQUENCY_UP_THRESHOLD,
+#ifdef CONFIG_HUAWEI_KERNEL
+	.lpspeed_count_threshold = DEF_LPSPEED_COUNT_THRESHOLD,
+	.lpspeed_enabled = 0,
+	.restrict_enabled = 0,
+#endif
 	.ignore_nice = 0,
 	.powersave_bias = 0,
 	.sync_freq = 0,
@@ -318,6 +347,15 @@ show_one(up_threshold_multi_core, up_threshold_multi_core);
 show_one(down_differential, down_differential);
 show_one(sampling_down_factor, sampling_down_factor);
 show_one(ignore_nice_load, ignore_nice);
+#ifdef CONFIG_HUAWEI_KERNEL
+show_one(input_freq, input_freq);
+show_one(hispeed_freq, hispeed_freq);
+show_one(lpspeed_freq, lpspeed_freq);
+show_one(lpspeed_count_threshold, lpspeed_count_threshold);
+show_one(lpspeed_enabled, lpspeed_enabled);
+show_one(restrict_freq, restrict_freq);
+show_one(restrict_enabled, restrict_enabled);
+#endif
 show_one(optimal_freq, optimal_freq);
 show_one(up_threshold_any_cpu_load, up_threshold_any_cpu_load);
 show_one(sync_freq, sync_freq);
@@ -683,6 +721,97 @@ skip_this_cpu_bypass:
 
 	return count;
 }
+#ifdef CONFIG_HUAWEI_KERNEL
+static ssize_t store_input_freq(struct kobject *a, struct attribute *b,
+				   const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+	dbs_tuners_ins.input_freq = input;
+	return count;
+}
+
+static ssize_t store_hispeed_freq(struct kobject *a, struct attribute *b,
+				   const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+	dbs_tuners_ins.hispeed_freq = min(input, dbs_tuners_ins.lpspeed_freq);
+	return count;
+}
+
+static ssize_t store_lpspeed_freq(struct kobject *a, struct attribute *b,
+				   const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+	dbs_tuners_ins.lpspeed_freq = max(input, dbs_tuners_ins.hispeed_freq);
+	return count;
+}
+
+static ssize_t store_lpspeed_count_threshold(struct kobject *a, struct attribute *b,
+				   const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+	dbs_tuners_ins.lpspeed_count_threshold = input;
+	return count;
+}
+
+static ssize_t store_lpspeed_enabled(struct kobject *a, struct attribute *b,
+				   const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+	dbs_tuners_ins.lpspeed_enabled = !!input;
+	return count;
+}
+static ssize_t store_restrict_freq(struct kobject *a, struct attribute *b,
+				   const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+	dbs_tuners_ins.restrict_freq = input;
+	return count;
+}
+
+static ssize_t store_restrict_enabled(struct kobject *a, struct attribute *b,
+				   const char *buf, size_t count)
+{
+	unsigned int input;
+	int ret;
+
+	ret = sscanf(buf, "%u", &input);
+	if (ret != 1)
+		return -EINVAL;
+	dbs_tuners_ins.restrict_enabled = !!input;
+	return count;
+}
+#endif
 
 define_one_global_rw(sampling_rate);
 define_one_global_rw(io_is_busy);
@@ -695,6 +824,15 @@ define_one_global_rw(up_threshold_multi_core);
 define_one_global_rw(optimal_freq);
 define_one_global_rw(up_threshold_any_cpu_load);
 define_one_global_rw(sync_freq);
+#ifdef CONFIG_HUAWEI_KERNEL
+define_one_global_rw(input_freq);
+define_one_global_rw(hispeed_freq);
+define_one_global_rw(lpspeed_freq);
+define_one_global_rw(lpspeed_count_threshold);
+define_one_global_rw(lpspeed_enabled);
+define_one_global_rw(restrict_freq);
+define_one_global_rw(restrict_enabled);
+#endif
 define_one_global_rw(input_boost);
 
 static struct attribute *dbs_attributes[] = {
@@ -710,6 +848,15 @@ static struct attribute *dbs_attributes[] = {
 	&optimal_freq.attr,
 	&up_threshold_any_cpu_load.attr,
 	&sync_freq.attr,
+#ifdef CONFIG_HUAWEI_KERNEL
+	&input_freq.attr,
+	&hispeed_freq.attr,
+	&lpspeed_freq.attr,
+	&lpspeed_count_threshold.attr,
+	&lpspeed_enabled.attr,
+	&restrict_freq.attr,
+	&restrict_enabled.attr,
+#endif
 	&input_boost.attr,
 	NULL
 };
@@ -742,6 +889,9 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 	unsigned int max_load_other_cpu = 0;
 	struct cpufreq_policy *policy;
 	unsigned int j;
+#ifdef CONFIG_HUAWEI_KERNEL
+	unsigned int new_freq;
+#endif
 
 	this_dbs_info->freq_lo = 0;
 	policy = this_dbs_info->cur_policy;
@@ -863,9 +1013,38 @@ static void dbs_check_cpu(struct cpu_dbs_info_s *this_dbs_info)
 		if (policy->cur < policy->max)
 			this_dbs_info->rate_mult =
 				dbs_tuners_ins.sampling_down_factor;
-		dbs_freq_increase(policy, policy->max);
+#ifdef CONFIG_HUAWEI_KERNEL
+		if (dbs_tuners_ins.lpspeed_enabled) {
+		    new_freq = min(dbs_tuners_ins.lpspeed_freq, policy->max);
+		    if (policy->cur < dbs_tuners_ins.hispeed_freq) {
+		        new_freq = min(new_freq, dbs_tuners_ins.hispeed_freq);
+		        if (dbs_tuners_ins.restrict_enabled) {
+		            new_freq = min(new_freq, dbs_tuners_ins.restrict_freq);
+		        }
+		        dbs_freq_increase(policy, new_freq);
+		        lpspeed_count = 0;
+		    } else if (policy->cur <= new_freq
+		        && lpspeed_count < dbs_tuners_ins.lpspeed_count_threshold) {
+		        if (dbs_tuners_ins.restrict_enabled) {
+		            new_freq = min(new_freq, dbs_tuners_ins.restrict_freq);
+		        }
+		        dbs_freq_increase(policy, new_freq);
+		        lpspeed_count++;
+		    } else if (dbs_tuners_ins.restrict_enabled) {
+		        new_freq = min(policy->max, dbs_tuners_ins.restrict_freq);
+		        dbs_freq_increase(policy, new_freq);
+		    } else {
+		        dbs_freq_increase(policy, policy->max);
+		    }
+		} else {
+		    dbs_freq_increase(policy, policy->max);
+		}
 		return;
 	}
+	if (dbs_tuners_ins.lpspeed_enabled) {
+	    lpspeed_count = 0;
+	}
+#endif
 
 	if (num_online_cpus() > 1) {
 
@@ -1023,6 +1202,9 @@ static void dbs_refresh_callback(struct work_struct *work)
 	struct cpu_dbs_info_s *this_dbs_info;
 	struct dbs_work_struct *dbs_work;
 	unsigned int cpu;
+#ifdef CONFIG_HUAWEI_KERNEL
+	unsigned int new_freq;
+#endif
 	unsigned int target_freq;
 
 	dbs_work = container_of(work, struct dbs_work_struct, work);
@@ -1044,20 +1226,39 @@ static void dbs_refresh_callback(struct work_struct *work)
 		target_freq = dbs_tuners_ins.input_boost;
 	else
 		target_freq = policy->max;
+#ifdef CONFIG_HUAWEI_KERNEL
+	if (dbs_tuners_ins.lpspeed_enabled) {
+	    new_freq = min(dbs_tuners_ins.input_freq, target_freq);
+	    if (dbs_tuners_ins.restrict_enabled) {
+	        new_freq = min(new_freq, dbs_tuners_ins.restrict_freq);
+	    }
+	    if (policy->cur < new_freq) {
+		    /*
+		     * Arch specific cpufreq driver may fail.
+		     * Don't update governor frequency upon failure.
+	    	 */
+		    if (__cpufreq_driver_target(policy, new_freq,
+					    CPUFREQ_RELATION_L) >= 0)
+	            policy->cur = new_freq;
 
-	if (policy->cur < target_freq) {
-		/*
-		 * Arch specific cpufreq driver may fail.
-		 * Don't update governor frequency upon failure.
-		 */
-		if (__cpufreq_driver_target(policy, target_freq,
-					CPUFREQ_RELATION_L) >= 0)
-			policy->cur = target_freq;
+	        this_dbs_info->prev_cpu_idle = get_cpu_idle_time(cpu,
+	                &this_dbs_info->prev_cpu_wall);
+	    }
+	} else {
+		if (policy->cur < target_freq) {
+			/*
+			 * Arch specific cpufreq driver may fail.
+			 * Don't update governor frequency upon failure.
+			 */
+			if (__cpufreq_driver_target(policy, target_freq,
+						CPUFREQ_RELATION_L) >= 0)
+				policy->cur = target_freq;
 
-		this_dbs_info->prev_cpu_idle = get_cpu_idle_time(cpu,
-				&this_dbs_info->prev_cpu_wall);
+			this_dbs_info->prev_cpu_idle = get_cpu_idle_time(cpu,
+					&this_dbs_info->prev_cpu_wall);
+		}
 	}
-
+#endif
 bail_incorrect_governor:
 	unlock_policy_rwsem_write(cpu);
 
@@ -1185,11 +1386,92 @@ static void dbs_input_event(struct input_handle *handle, unsigned int type,
 		queue_work_on(i, dbs_wq, &per_cpu(dbs_refresh_work, i).work);
 }
 
+#ifdef CONFIG_HUAWEI_KERNEL
+/* Filter some input devices which we don't care */
+static int input_dev_filter(const char* input_dev_name)
+{
+    int ret = false;
+
+    if (strstr(input_dev_name, "sensors")
+        || strstr(input_dev_name, "_test_input")
+        || strstr(input_dev_name, "input_accl")
+        || strstr(input_dev_name, "input_compass")
+        || strstr(input_dev_name, "light sensor")
+        || strstr(input_dev_name, "proximity sensor")) {
+        ret = true;
+    } else {
+        ret = false;
+    }
+    return ret;
+}
+void set_up_threshold(int screen_on)
+{
+    char *buff_on = DEF_FREQUENCY_UP_THRESHOLD_STRING; //"80"
+    char *buff_off = MICRO_FREQUENCY_UP_THRESHOLD_STRING; //"95"
+
+    if(1 == screen_on)
+    {
+        store_up_threshold(NULL, NULL, buff_on, strlen(buff_on));
+    }
+    else
+    {
+        store_up_threshold(NULL, NULL, buff_off, strlen(buff_off));
+    }
+}
+EXPORT_SYMBOL(set_up_threshold);
+
+static int fb_notifier_callback(struct notifier_block *self,
+                                unsigned long event, void *data)
+{
+    struct fb_event *evdata = data;
+    int *blank = NULL;
+
+    if (evdata && evdata->data && event == FB_EVENT_BLANK && self) 
+    {
+        blank = evdata->data;
+        pr_err("%s:%d %d\n",__func__,__LINE__, *blank);
+
+        if (FB_BLANK_UNBLANK == *blank)
+        {
+            /* Set up_threshold to DEF_FREQUENCY_UP_THRESHOLD when screen is ready to on */
+            set_up_threshold(true);
+        }
+        else
+        {
+            /* Set up_threshold to MICRO_FREQUENCY_UP_THRESHOLD when screen is off */
+            set_up_threshold(false);
+        }
+    }
+    pr_err("%s:%d %ld\n",__func__,__LINE__, event);
+
+    return 0;
+}
+
+static void configure_sleep(struct notifier_block *cpu_set_notify)
+{
+    int retval = 0;
+
+    cpu_set_notify->notifier_call = fb_notifier_callback;
+    /*register the callback to the FB*/
+    retval = fb_register_client(cpu_set_notify);
+    if (retval)
+        pr_err("Unable to register fb_notifier: %d\n", retval);
+    return;
+}
+#endif
+
 static int dbs_input_connect(struct input_handler *handler,
 		struct input_dev *dev, const struct input_device_id *id)
 {
 	struct input_handle *handle;
 	int error;
+    
+#ifdef CONFIG_HUAWEI_KERNEL
+    /* Filter out those input_dev that we don't care */
+    if (input_dev_filter(dev->name)) {
+        return 0;
+    }
+#endif
 
 	handle = kzalloc(sizeof(struct input_handle), GFP_KERNEL);
 	if (!handle)
@@ -1223,6 +1505,7 @@ static void dbs_input_disconnect(struct input_handle *handle)
 }
 
 static const struct input_device_id dbs_ids[] = {
+
 	/* multi-touch touchscreen */
 	{
 		.flags = INPUT_DEVICE_ID_MATCH_EVBIT |
@@ -1245,7 +1528,9 @@ static const struct input_device_id dbs_ids[] = {
 		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
 		.evbit = { BIT_MASK(EV_KEY) },
 	},
+
 	{ },
+
 };
 
 static struct input_handler dbs_input_handler = {
@@ -1317,6 +1602,12 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 				max(min_sampling_rate,
 				    latency * LATENCY_MULTIPLIER);
 			dbs_tuners_ins.io_is_busy = should_io_be_busy();
+#ifdef CONFIG_HUAWEI_KERNEL
+			dbs_tuners_ins.input_freq = policy->max;
+			dbs_tuners_ins.hispeed_freq = policy->max;
+			dbs_tuners_ins.lpspeed_freq = policy->max;
+			dbs_tuners_ins.restrict_freq = policy->max;
+#endif
 
 			if (dbs_tuners_ins.optimal_freq == 0)
 				dbs_tuners_ins.optimal_freq = policy->min;
@@ -1434,14 +1725,18 @@ static int __init cpufreq_gov_dbs_init(void)
 							 (void *)i,
 							 "dbs_sync/%d", i);
 	}
-
+#ifdef CONFIG_HUAWEI_KERNEL
+    configure_sleep(&fb_notify);
+#endif
 	return cpufreq_register_governor(&cpufreq_gov_ondemand);
 }
 
 static void __exit cpufreq_gov_dbs_exit(void)
 {
 	unsigned int i;
-
+#ifdef CONFIG_HUAWEI_KERNEL
+    fb_unregister_client(&fb_notify);
+#endif
 	cpufreq_unregister_governor(&cpufreq_gov_ondemand);
 	for_each_possible_cpu(i) {
 		struct cpu_dbs_info_s *this_dbs_info =

@@ -15,6 +15,18 @@
 #include <linux/mod_devicetable.h>
 #include <linux/notifier.h>
 
+#ifdef CONFIG_MMC_WP_SYSTEM
+#define MMC_WP_SYSTEM_PARTNO  "mmcblk0p23"
+extern bool mmc_wp_partition_enable;
+#endif
+
+#ifdef CONFIG_HUAWEI_KERNEL
+#define EMMC_SANDISK_MANFID 0x45
+#define EMMC_HYNIX_MANFID 0x90
+#define EMMC_SAMSUNG_MANFID 0x15
+#define EMMC_TOSHIBA_MANFID 0x11
+#endif
+
 struct mmc_cid {
 	unsigned int		manfid;
 	char			prod_name[8];
@@ -80,6 +92,9 @@ struct mmc_ext_csd {
 	unsigned int		enhanced_area_size;	/* Units: KB */
 	unsigned int		cache_size;		/* Units: KB */
 	bool			hpi_en;			/* HPI enablebit */
+#ifdef CONFIG_HUAWEI_KERNEL 
+    bool		    hpi_bkops_en;		/* HPI+BKOPS enablebit */
+#endif
 	bool			hpi;			/* HPI support bit */
 	unsigned int		hpi_cmd;		/* cmd used as HPI */
 	bool			bkops;		/* background support bit */
@@ -352,6 +367,12 @@ struct mmc_card {
 #define MMC_QUIRK_INAND_DATA_TIMEOUT  (1<<8)    /* For incorrect data timeout */
 /* To avoid eMMC device getting broken permanently due to HPI feature */
 #define MMC_QUIRK_BROKEN_HPI (1 << 11)
+
+/* To avoid conflict with linux forum, Huawei added quirk macro value should started from 20 */
+#ifdef CONFIG_HUAWEI_KERNEL 
+#define MMC_QUIRK_SAMSUNG_SMART (1<<20)          /* Samsung SMART is available */ 
+#define MMC_QUIRK_ONLY_HPI_BKOPS (1<<21)          /* Only enable HPI+BKOPS mode */ 
+#endif
 
 	unsigned int		erase_size;	/* erase size in sectors */
  	unsigned int		erase_shift;	/* if erase unit is power 2 */
@@ -649,4 +670,7 @@ extern struct mmc_wr_pack_stats *mmc_blk_get_packed_statistics(
 extern void mmc_blk_init_packed_statistics(struct mmc_card *card);
 extern void mmc_blk_disable_wr_packing(struct mmc_queue *mq);
 extern int mmc_send_long_pon(struct mmc_card *card);
+#ifdef CONFIG_HUAWEI_KERNEL 
+extern ssize_t mmc_samsung_smart_handle(struct mmc_card *card, char *buf); 
+#endif
 #endif /* LINUX_MMC_CARD_H */

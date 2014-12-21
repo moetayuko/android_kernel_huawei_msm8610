@@ -30,6 +30,9 @@ enum {
 };
 static int debug_mask = DEBUG_USER_STATE;
 module_param_named(debug_mask, debug_mask, int, S_IRUGO | S_IWUSR | S_IWGRP);
+#ifdef CONFIG_HUAWEI_KERNEL
+void set_up_threshold(int screen_on);
+#endif
 
 static DEFINE_MUTEX(early_suspend_lock);
 static LIST_HEAD(early_suspend_handlers);
@@ -101,6 +104,10 @@ static void early_suspend(struct work_struct *work)
 			pos->suspend(pos);
 		}
 	}
+#ifdef CONFIG_HUAWEI_KERNEL
+    /* Set up_threshold to MICRO_FREQUENCY_UP_THRESHOLD when screen is off */
+    set_up_threshold(false);
+#endif
 	mutex_unlock(&early_suspend_lock);
 
 	if (debug_mask & DEBUG_SUSPEND)
@@ -121,6 +128,10 @@ static void late_resume(struct work_struct *work)
 	int abort = 0;
 
 	mutex_lock(&early_suspend_lock);
+#ifdef CONFIG_HUAWEI_KERNEL
+    /* Set up_threshold to DEF_FREQUENCY_UP_THRESHOLD when screen is ready to on */
+    set_up_threshold(true);
+#endif
 	spin_lock_irqsave(&state_lock, irqflags);
 	if (state == SUSPENDED)
 		state &= ~SUSPENDED;

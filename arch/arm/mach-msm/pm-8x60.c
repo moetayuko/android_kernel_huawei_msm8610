@@ -61,6 +61,10 @@
 #include "pm-boot.h"
 #include <mach/event_timer.h>
 #include <linux/cpu_pm.h>
+#ifdef CONFIG_HUAWEI_KERNEL
+#include <mach/gpiomux.h>
+#include <linux/regulator/consumer.h>
+#endif
 
 #define SCM_L2_RETENTION	(0x2)
 #define SCM_CMD_TERMINATE_PC	(0x2)
@@ -92,6 +96,10 @@ enum {
 	MSM_PM_DEBUG_IDLE = BIT(6),
 	MSM_PM_DEBUG_IDLE_LIMITS = BIT(7),
 	MSM_PM_DEBUG_HOTPLUG = BIT(8),
+#ifdef CONFIG_HUAWEI_KERNEL
+	MSM_PM_DEBUG_GPIO = BIT(16),
+	MSM_PM_DEBUG_REGULATOR=BIT(17),
+#endif
 };
 
 enum {
@@ -1019,6 +1027,16 @@ void msm_pm_cpu_enter_lowpower(unsigned int cpu)
 		msm_pm_swfi();
 }
 
+#ifdef CONFIG_HUAWEI_KERNEL
+static int msm_pm_regulator_print(void)
+{
+	if (MSM_PM_DEBUG_REGULATOR & msm_pm_debug_mask){
+		regulator_debug_print_enabled();
+    }
+    return 0;
+}
+#endif
+
 static void msm_pm_ack_retention_disable(void *data)
 {
 	/*
@@ -1096,6 +1114,11 @@ static int msm_pm_enter(suspend_state_t state)
 
 		clock_debug_print_enabled();
 
+#ifdef CONFIG_HUAWEI_KERNEL
+		if (MSM_PM_DEBUG_GPIO & msm_pm_debug_mask){
+			msm_gpio_print_enabled();
+        }
+#endif
 		if (msm_pm_sleep_time_override > 0) {
 			int64_t ns = NSEC_PER_SEC *
 				(int64_t) msm_pm_sleep_time_override;
@@ -1155,6 +1178,7 @@ static int msm_suspend_prepare(void)
 {
 	suspend_time = msm_pm_timer_enter_suspend(&suspend_period);
 	msm_mpm_suspend_prepare();
+    msm_pm_regulator_print();
 	return 0;
 }
 

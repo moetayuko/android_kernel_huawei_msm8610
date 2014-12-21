@@ -467,3 +467,8 @@ config RADIO_IRIS_TRANSPORT
           module will be called radio-iris-transport.
 
 endif # RADIO_ADAPTERS
+config HUAWEI_RADIO
+        tristate "Huawei modify for Qualcomm radio"
+        depends on HUAWEI_KERNEL
+        help
+          use huawei feature

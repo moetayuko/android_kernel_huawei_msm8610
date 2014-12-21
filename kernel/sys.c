@@ -85,6 +85,14 @@
 # define SET_TSC_CTL(a)		(-EINVAL)
 #endif
 
+
+#ifdef CONFIG_HW_PANIC_ON_DELAY_AT_INIT_N_REBOOT
+#define MAX_SHUTDOWN_TIME 60000
+#define hw_dbg(x...) do {printk("%s: ",__FUNCTION__); printk(x);} while (0)
+#else
+#define hw_dbg(x...)
+#endif
+
 /*
  * this is where the system-wide overflow UID and GID are defined, for
  * architectures that now have 32-bit UID/GID but didn't in the past
@@ -299,6 +307,15 @@ out_unlock:
 	return retval;
 }
 
+#ifdef CONFIG_HW_PANIC_ON_DELAY_AT_INIT_N_REBOOT
+void shutdown_timer_cb(unsigned long context)
+{
+	printk(KERN_ERR "shutdown/reboot/halt timer from %lu!\n", context);
+	panic("shutdown/reboot/halt didnt finish clean");
+};
+#endif
+
+
 /**
  *	emergency_restart - reboot the system
  *
@@ -309,6 +326,20 @@ out_unlock:
  */
 void emergency_restart(void)
 {
+#ifdef CONFIG_HW_PANIC_ON_DELAY_AT_INIT_N_REBOOT
+	struct timer_list em_restart_timer;
+	int timer_rc;
+
+	/* Adda  timer and from the callback do a panic. We are delibarately
+	 * not deleting the timer. There is no return from machien_restart, 
+	 * and we dont want to miss the remote possbility of there being
+	 * something wrng with macine_restart!!!*/
+	hw_dbg("setting up emergency restart timer\n");
+	setup_timer(&em_restart_timer, shutdown_timer_cb, 5);
+	timer_rc = mod_timer(&em_restart_timer, jiffies+msecs_to_jiffies(MAX_SHUTDOWN_TIME));
+	if (timer_rc)
+		printk(KERN_ERR "Error adding the shutdown timer: %d\n", timer_rc);
+#endif
 	kmsg_dump(KMSG_DUMP_EMERG);
 	machine_emergency_restart();
 }
@@ -317,10 +348,14 @@ EXPORT_SYMBOL_GPL(emergency_restart);
 void kernel_restart_prepare(char *cmd)
 {
 	blocking_notifier_call_chain(&reboot_notifier_list, SYS_RESTART, cmd);
+	hw_dbg("blocking_notifier_call_chain done\n");
 	system_state = SYSTEM_RESTART;
 	usermodehelper_disable();
+	hw_dbg("usermodehelper_disable done\n");
 	device_shutdown();
+	hw_dbg("device_shutdown done\n");
 	syscore_shutdown();
+	hw_dbg("syscore_shutdown done\n");
 }
 
 /**
@@ -364,11 +399,28 @@ EXPORT_SYMBOL(unregister_reboot_notifier);
  */
 void kernel_restart(char *cmd)
 {
+
+#ifdef CONFIG_HW_PANIC_ON_DELAY_AT_INIT_N_REBOOT
+	struct timer_list restart_timer;
+	int timer_rc;
+
+	/* Adda  timer and from the callback do a panic. We are delibarately
+	 * not deleting the timer. There is no return from machien_restart, 
+	 * and we dont want to miss the remote possbility of there being
+	 * something wrng with macine_restart!!!*/
+	hw_dbg("setting up restart timer\n");
+	setup_timer(&restart_timer, shutdown_timer_cb, 2);
+	timer_rc = mod_timer(&restart_timer, jiffies+msecs_to_jiffies(MAX_SHUTDOWN_TIME));
+	if (timer_rc)
+		printk(KERN_ERR "Error adding the shutdown timer: %d\n", timer_rc);
+#endif
+
 	kernel_restart_prepare(cmd);
 	if (!cmd)
 		printk(KERN_EMERG "Restarting system.\n");
 	else
 		printk(KERN_EMERG "Restarting system with command '%s'.\n", cmd);
+
 	kmsg_dump(KMSG_DUMP_RESTART);
 	machine_restart(cmd);
 }
@@ -376,11 +428,15 @@ EXPORT_SYMBOL_GPL(kernel_restart);
 
 static void kernel_shutdown_prepare(enum system_states state)
 {
+	hw_dbg("calling notifiers\n");
 	blocking_notifier_call_chain(&reboot_notifier_list,
 		(state == SYSTEM_HALT)?SYS_HALT:SYS_POWER_OFF, NULL);
+	hw_dbg("blocking_notifier_call_chain done\n");
 	system_state = state;
 	usermodehelper_disable();
+	hw_dbg("usermodehelper_disable done\n");
 	device_shutdown();
+	hw_dbg("device_shutdown done\n");
 }
 /**
  *	kernel_halt - halt the system
@@ -389,6 +445,21 @@ static void kernel_shutdown_prepare(enum system_states state)
  */
 void kernel_halt(void)
 {
+#ifdef CONFIG_HW_PANIC_ON_DELAY_AT_INIT_N_REBOOT
+	struct timer_list halt_timer;
+	int timer_rc;
+
+	/* Add a timer, and frm the callback do a panic. We are deliberately 
+	 * not calling the del_timer. There is no  return from machine_halt, 
+	 * and we dont want to miss the remote possibility of there being 
+	 * something wrong with machine_halt!!! */
+	hw_dbg("setting up halt timer\n");
+	setup_timer(&halt_timer, shutdown_timer_cb, 3);
+	timer_rc = mod_timer(&halt_timer, jiffies+msecs_to_jiffies(MAX_SHUTDOWN_TIME));
+	if (timer_rc)
+		printk(KERN_ERR "Error adding the shutdown timer: %d\n", timer_rc);
+#endif
+
 	kernel_shutdown_prepare(SYSTEM_HALT);
 	syscore_shutdown();
 	printk(KERN_EMERG "System halted.\n");
@@ -405,6 +476,21 @@ EXPORT_SYMBOL_GPL(kernel_halt);
  */
 void kernel_power_off(void)
 {
+#ifdef CONFIG_HW_PANIC_ON_DELAY_AT_INIT_N_REBOOT
+	struct timer_list timer;
+	int timer_rc;
+
+	/* Add a timer, and frm the callback do a panic. We are deliberately 
+	 * not calling the del_timer. There is no  return from machine_power_off, 
+	 * and we dont want to miss the remote possibility of there being 
+	 * something wrong with machine_power_off!!! */
+	hw_dbg("setting up power off timer\n");
+	setup_timer(&timer, shutdown_timer_cb, 4);
+	timer_rc = mod_timer(&timer, jiffies+msecs_to_jiffies(MAX_SHUTDOWN_TIME));
+	if (timer_rc)
+		printk(KERN_ERR "Error adding the shutdown timer: %d\n", timer_rc);
+#endif
+
 	kernel_shutdown_prepare(SYSTEM_POWER_OFF);
 	if (pm_power_off_prepare)
 		pm_power_off_prepare();
@@ -2026,6 +2112,18 @@ int orderly_poweroff(bool force)
 	int ret = -ENOMEM;
 	struct subprocess_info *info;
 
+#ifdef CONFIG_HW_PANIC_ON_DELAY_AT_INIT_N_REBOOT
+	struct timer_list timer;
+	int timer_rc;
+
+	/* Add a timer, and frm the callback do a panic. */
+	hw_dbg("setting up timer for orderly poweroff");
+	setup_timer(&timer, shutdown_timer_cb, 1);
+	timer_rc = mod_timer(&timer, jiffies+msecs_to_jiffies(MAX_SHUTDOWN_TIME));
+	if (timer_rc)
+		printk(KERN_ERR "Error adding the shutdown timer: %d\n", timer_rc);
+#endif
+
 	if (argv == NULL) {
 		printk(KERN_WARNING "%s failed to allocate memory for \"%s\"\n",
 		       __func__, poweroff_cmd);
@@ -2051,6 +2149,10 @@ int orderly_poweroff(bool force)
 		   sync and poweroff asap.  Or not even bother syncing
 		   if we're doing an emergency shutdown? */
 		emergency_sync();
+#ifdef CONFIG_HW_PANIC_ON_DELAY_AT_INIT_N_REBOOT
+		if (timer_rc == 0)
+			del_timer(&timer);
+#endif
 		kernel_power_off();
 	}
 

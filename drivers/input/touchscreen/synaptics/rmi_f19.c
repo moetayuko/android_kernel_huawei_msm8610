@@ -76,9 +76,7 @@ static ssize_t rmi_f19_buttonMap_show(struct device *dev,
 static ssize_t rmi_f19_buttonMap_store(struct device *dev,
 				struct device_attribute *attr,
 				const char *buf, size_t count);
-
-DEVICE_ATTR(buttonMap, 0664, rmi_f19_buttonMap_show, rmi_f19_buttonMap_store);	/* RW attr */
-
+DEVICE_ATTR(buttonMap, 0644, rmi_f19_buttonMap_show, rmi_f19_buttonMap_store);	/* RW attr */
 
 /*
  * There is no attention function for F19 - it is left NULL

@@ -1795,6 +1795,24 @@ out:
 }
 EXPORT_SYMBOL_GPL(device_move);
 
+#ifdef CONFIG_HW_PANIC_ON_DELAY_AT_INIT_N_REBOOT
+void dev_shutdown_timer_cb(unsigned long data)
+{
+	struct device *dev = (struct device *)data;
+
+	printk(KERN_ERR "Error shutting down dev:%p, timer fired\n", dev);
+	if (dev) {
+		if (dev->init_name)
+			printk(KERN_ERR "Device name: %s\n", dev->init_name);
+		if (dev->driver)
+			printk(KERN_ERR "Driver name: %s\n", dev->driver->name);
+		if (dev->driver->bus)
+			printk(KERN_ERR "Bus name: %s\n", dev->driver->bus->name);
+	}
+	panic("Error removing dev, panic-on-timeout");
+}
+#endif
+
 /**
  * device_shutdown - call ->shutdown() on each device to shutdown.
  */
@@ -1809,9 +1827,23 @@ void device_shutdown(void)
 	 * devices offline, even as the system is shutting down.
 	 */
 	while (!list_empty(&devices_kset->list)) {
+
+#ifdef CONFIG_HW_PANIC_ON_DELAY_AT_INIT_N_REBOOT
+		struct timer_list timer;
+		int timer_rc  = 0;
+#endif 
+
 		dev = list_entry(devices_kset->list.prev, struct device,
 				kobj.entry);
 		get_device(dev);
+
+#ifdef CONFIG_HW_PANIC_ON_DELAY_AT_INIT_N_REBOOT
+		setup_timer(&timer, dev_shutdown_timer_cb, (unsigned long)dev);
+		timer_rc = mod_timer(&timer, jiffies + msecs_to_jiffies(6000));
+		if (timer_rc) 
+			printk("Error adding dev shutdown timer\n");
+#endif
+
 		/*
 		 * Make sure the device is off the kset list, in the
 		 * event that dev->*->shutdown() doesn't remove it.
@@ -1833,6 +1865,12 @@ void device_shutdown(void)
 		put_device(dev);
 
 		spin_lock(&devices_kset->list_lock);
+
+#ifdef CONFIG_HW_PANIC_ON_DELAY_AT_INIT_N_REBOOT
+		if (timer_rc == 0) 
+			del_timer(&timer);
+#endif
+
 	}
 	spin_unlock(&devices_kset->list_lock);
 	async_synchronize_full();

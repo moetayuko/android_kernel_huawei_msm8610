@@ -32,12 +32,14 @@
 		interrupts = <0 30 0>;
 		vdd-supply = <&pm8110_l4>;
 		vdda-supply = <&pm8110_l19>;
-		vddio-supply = <&pm8110_l14>;
+		vddio-supply = <&pm8110_l6>;
 		qcom,mdss-fb-map = <&mdss_fb0>;
 		qcom,mdss-mdp = <&mdss_mdp>;
 		qcom,platform-reset-gpio = <&msmgpio 41 0>;
 		qcom,platform-te-gpio = <&msmgpio 12 0>;
-		qcom,platform-mode-gpio = <&msmgpio 7 0>;
+		//qcom,platform-mode-gpio = <&msmgpio 7 0>;
+		huawei,platform-bias-enp-gpio = <&msmgpio 8 0>;
+		huawei,platform-bias-enn-gpio = <&msmgpio 9 0>;
 		qcom,platform-strength-ctrl = [ff 06];
 		qcom,platform-bist-ctrl = [03 03 00 00 0f 00];
 		qcom,platform-regulator-settings = [02 08 05 00 20 03];

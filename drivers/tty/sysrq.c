@@ -603,6 +603,66 @@ static void sysrq_reinject_alt_sysrq(struct work_struct *work)
 	}
 }
 
+#ifdef CONFIG_HUAWEI_KERNEL
+static bool sysrq_down = false;
+static int sysrq_alt_use = 0;
+static int sysrq_alt = 0;
+
+static bool sysrq_filter(struct input_handle *handle, unsigned int type,
+		         unsigned int code, int value)
+{
+	if (type != EV_KEY)
+		goto out;
+
+	switch (code) {
+
+    /* use volumedown + volumeup + power for sysrq function */ 
+	case KEY_VOLUMEDOWN:
+	    /* identify volumedown pressed down or not */ 
+		if (value)
+		{
+			sysrq_alt = code;
+		}
+		/* when volumedown lifted up clear the state of syrq_down and syrq_alt */ 
+		else
+		{
+			if (sysrq_down && code == sysrq_alt_use)
+			{
+				sysrq_down = false;
+			}
+			sysrq_alt = 0;
+		}
+		break;
+
+	case KEY_VOLUMEUP:
+	    /* identify volumeup pressed down or not */ 
+		if (value == 1 && sysrq_alt)
+		{
+			sysrq_down = true;
+			sysrq_alt_use = sysrq_alt;
+		}
+		break;
+
+	case KEY_POWER:
+	    /* identify power pressed down or not */ 
+		if (sysrq_down && value && value != 2)
+		{
+			pr_debug("trigger system crash by sysrq");
+			/* trigger system crash */ 
+			__handle_sysrq('c', true);
+		}
+		break;
+		
+	default:
+		break;
+	}
+
+out:
+	return sysrq_down;
+}
+
+#else
+
 static bool sysrq_filter(struct input_handle *handle,
 			 unsigned int type, unsigned int code, int value)
 {
@@ -706,6 +766,7 @@ static bool sysrq_filter(struct input_handle *handle,
 
 	return suppress;
 }
+#endif
 
 static int sysrq_connect(struct input_handler *handler,
 			 struct input_dev *dev,
@@ -713,6 +774,11 @@ static int sysrq_connect(struct input_handler *handler,
 {
 	struct sysrq_state *sysrq;
 	int error;
+
+#ifdef CONFIG_HUAWEI_KERNEL
+    sysrq_down = false;
+    sysrq_alt = 0;
+#endif
 
 	sysrq = kzalloc(sizeof(struct sysrq_state), GFP_KERNEL);
 	if (!sysrq)
@@ -764,10 +830,16 @@ static void sysrq_disconnect(struct input_handle *handle)
  */
 static const struct input_device_id sysrq_ids[] = {
 	{
+	/* remove the keybit of KEY_LEFTALT for sysrq function */ 
+#ifdef CONFIG_HUAWEI_KERNEL
+		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
+		.evbit = { BIT_MASK(EV_KEY) },
+#else
 		.flags = INPUT_DEVICE_ID_MATCH_EVBIT |
 				INPUT_DEVICE_ID_MATCH_KEYBIT,
 		.evbit = { BIT_MASK(EV_KEY) },
 		.keybit = { BIT_MASK(KEY_LEFTALT) },
+#endif
 	},
 	{ },
 };

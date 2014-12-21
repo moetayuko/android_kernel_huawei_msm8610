@@ -21,6 +21,15 @@
 #include <linux/spinlock.h>
 #include <linux/spmi.h>
 
+#ifdef CONFIG_HUAWEI_FEATURE_POWEROFF_ALARM
+#include <linux/reboot.h>
+#include <linux/syscalls.h>
+#include <linux/workqueue.h>
+#include <linux/init.h>
+#include <linux/string.h>
+extern struct rtc_wkalrm poweroff_rtc_alarm;
+#endif
+
 /* RTC/ALARM Register offsets */
 #define REG_OFFSET_ALARM_RW	0x40
 #define REG_OFFSET_ALARM_CTRL1	0x46
@@ -392,6 +401,27 @@ static struct rtc_class_ops qpnp_rtc_ops = {
 	.alarm_irq_enable = qpnp_rtc_alarm_irq_enable,
 };
 
+#ifdef CONFIG_HUAWEI_FEATURE_POWEROFF_ALARM
+/*check wheather it's in power-off charge state*/
+bool is_recoverychg(void)
+{
+    char *p;
+    p = strstr(saved_command_line, "hwcharger");
+    if (p) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+static struct work_struct oem_rtc_reboot_queue;
+static void oem_rtc_reboot(struct work_struct *work)
+{
+    sys_sync();
+    kernel_restart("huawei_rtc");
+}
+#endif
+
 static irqreturn_t qpnp_alarm_trigger(int irq, void *dev_id)
 {
 	struct qpnp_rtc *rtc_dd = dev_id;
@@ -400,7 +430,23 @@ static irqreturn_t qpnp_alarm_trigger(int irq, void *dev_id)
 	unsigned long irq_flags;
 
 	rtc_update_irq(rtc_dd->rtc, 1, RTC_IRQF | RTC_AF);
+#ifdef CONFIG_HUAWEI_FEATURE_POWEROFF_ALARM
+    /*
+    * The device is charging in recovery mode;
+    * When the power-off alarm irq is triggered,
+    * the device need to be rebooted
+    */
+    if(unlikely(is_recoverychg())) 
+    {
+        u8 value[4] = {0};
+        qpnp_read_wrapper(rtc_dd, value,rtc_dd->alarm_base + REG_OFFSET_ALARM_RW,NUM_8_BIT_RTC_REGS);
 
+        if(value[0]|value[1]|value[2]|value[3])
+        {
+            schedule_work(&oem_rtc_reboot_queue);
+        }
+    }
+#endif
 	spin_lock_irqsave(&rtc_dd->alarm_ctrl_lock, irq_flags);
 
 	/* Clear the alarm enable bit */
@@ -564,6 +610,11 @@ static int __devinit qpnp_rtc_probe(struct spmi_device *spmi)
 		dev_err(&spmi->dev, "Request IRQ failed (%d)\n", rc);
 		goto fail_req_irq;
 	}
+#ifdef CONFIG_HUAWEI_FEATURE_POWEROFF_ALARM
+/*if device run in power down charging mode ,alarm interrupt is enabled*/
+    if(unlikely(is_recoverychg()))
+        qpnp_rtc_alarm_irq_enable(rtc_dd->rtc_dev,1);
+#endif
 
 	device_init_wakeup(&spmi->dev, 1);
 	enable_irq_wake(rtc_dd->rtc_alarm_irq);
@@ -601,7 +652,14 @@ static void qpnp_rtc_shutdown(struct spmi_device *spmi)
 	struct qpnp_rtc *rtc_dd = dev_get_drvdata(&spmi->dev);
 	bool rtc_alarm_powerup = rtc_dd->rtc_alarm_powerup;
 
+#ifdef CONFIG_HUAWEI_FEATURE_POWEROFF_ALARM
+    if(unlikely(is_recoverychg()))
+        return;
+
+    if (!rtc_alarm_powerup || !poweroff_rtc_alarm.enabled) {
+#else
 	if (!rtc_alarm_powerup && !poweron_alarm) {
+#endif
 		spin_lock_irqsave(&rtc_dd->alarm_ctrl_lock, irq_flags);
 		dev_dbg(&spmi->dev, "Disabling alarm interrupts\n");
 
@@ -625,6 +683,15 @@ static void qpnp_rtc_shutdown(struct spmi_device *spmi)
 fail_alarm_disable:
 		spin_unlock_irqrestore(&rtc_dd->alarm_ctrl_lock, irq_flags);
 	}
+#ifdef CONFIG_HUAWEI_FEATURE_POWEROFF_ALARM
+    else if (poweroff_rtc_alarm.enabled)
+	{
+       /* Set poweroff rtc alarm again
+        * This will clean the rtc irq state
+        */
+        qpnp_rtc_set_alarm(rtc_dd->rtc_dev, &poweroff_rtc_alarm);
+    }
+#endif
 }
 
 static struct of_device_id spmi_match_table[] = {
@@ -647,6 +714,10 @@ static struct spmi_driver qpnp_rtc_driver = {
 
 static int __init qpnp_rtc_init(void)
 {
+#ifdef CONFIG_HUAWEI_FEATURE_POWEROFF_ALARM
+    INIT_WORK(&oem_rtc_reboot_queue, oem_rtc_reboot);
+#endif
+
 	return spmi_driver_register(&qpnp_rtc_driver);
 }
 module_init(qpnp_rtc_init);

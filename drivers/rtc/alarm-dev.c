@@ -192,6 +192,16 @@ from_old_alarm_set:
 			goto err1;
 		}
 		break;
+#ifdef CONFIG_HUAWEI_FEATURE_POWEROFF_ALARM
+    case ANDROID_RTC_ALARM_SET:
+        if (copy_from_user(&new_alarm_time, (void __user *)arg,
+                            sizeof(new_alarm_time))) {
+            rv = -EFAULT;
+            goto err1;
+        }
+        alarm_set_rtc_alarm(new_alarm_time.tv_sec, true);
+        break;
+#endif
 
 	default:
 		rv = -EINVAL;

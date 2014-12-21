@@ -39,6 +39,12 @@
 #include <linux/log2.h>
 #include <linux/crc16.h>
 #include <linux/cleancache.h>
+#ifdef CONFIG_EXT4_HUAWEI_DEBUG
+#include <linux/fcntl.h>
+#include <linux/syscalls.h>
+#include <asm/unistd.h>
+#include <linux/debugfs.h>
+#endif
 #include <asm/uaccess.h>
 
 #include <linux/kthread.h>
@@ -50,9 +56,17 @@
 #include "xattr.h"
 #include "acl.h"
 #include "mballoc.h"
+#ifdef CONFIG_EXT4_HUAWEI_READ_ONLY_RECOVERY
+#include <linux/reboot.h>
+#endif
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/ext4.h>
+
+#ifdef CONFIG_FEATURE_HUAWEI_EMERGENCY_DATA
+#include <asm/setup.h>
+extern unsigned int get_datamount_flag(void);
+#endif
 
 static struct proc_dir_entry *ext4_proc_root;
 static struct kset *ext4_kset;
@@ -463,11 +477,363 @@ static void ext4_journal_commit_callback(journal_t *journal, transaction_t *txn)
  * the journal instead.  On recovery, the journal will complain about
  * that error until we've noted it down and cleared it.
  */
+#ifdef CONFIG_EXT4_HUAWEI_DEBUG
+
+#define KMSG_BUF_LEN	         (1 << CONFIG_LOG_BUF_SHIFT)     /* The kernel log buffer length */
+#define MOUNT_FILE               "/proc/mounts"                  /* The mounted file path, it perhaps be /proc/fstab or /proc/mtab or others */
+#define LINE_MAX                 1024                            /* The max length of line_buf to save one line in the mounted file */
+#define CONTENT_MAX              512                             /* The max length of each field in one line */
+#define LOG_PATH                 "/ext4_error_log"               /* We want to save the log file in this directory */
+
+/* When parse one line in the mounted file, the first field is block name,
+   the second field is mounted directory, we need this struct to save this two field
+*/
+struct _MNT_CONTENT
+{
+    char mnt_name[CONTENT_MAX];
+    char mnt_dir[CONTENT_MAX];
+};
+
+static struct _MNT_CONTENT mnt_content;          /* This is used to save forefront two fields of one line */
+static char line_buf[LINE_MAX] = {0};            /* This is used to save one line in the mounted file */
+extern const char *kmsg_buf;                     /* The kernel log buf start address */
+static unsigned char ext4_kmsg_flag = 0;         /* This is a mutex flag */
+unsigned char do_not_check_permission_flag = 0;       /* check the permission flag */
+
+/* The following function is used to get a new line from specified file */
+static char * fget_line(char * buf, int max_num, int fd)
+{
+	char c_buf;
+	int i = 0;
+
+    memset(buf, 0, max_num);
+    while(i<max_num)
+    {
+        if (sys_read(fd, &c_buf, 1) != 1)
+        {
+            break;        
+    	}
+        if(c_buf=='\n')
+        {
+            buf[i] = 0;
+            break;
+        }
+	buf[i++]=c_buf;        
+    }
+    
+    if(0==i)
+        return NULL;
+    else
+        return buf;
+}
+
+/* The following function is used to parse one line and get the mounted information */
+static void parse_line(char *line_buffer, struct _MNT_CONTENT *mount_content)
+{
+    int i = 0;
+    int j = 0;
+    int space_flag = 0;
+    for (i=0; i<CONTENT_MAX; i++)
+    {
+        if (line_buffer[i] != ' ')
+        {
+            if (space_flag == 0)
+            {
+                mount_content->mnt_name[i] = line_buffer[i];
+            }
+            else if (space_flag == 1)
+            {
+                mount_content->mnt_dir[j] = line_buffer[i];
+                j++;
+            }
+            else
+            {
+                break;
+            }
+            
+            if (line_buffer[i+1] == ' ')
+            {
+                space_flag++;
+            }
+        }
+        else
+        {
+            continue;
+        }
+    }
+    
+    return;
+}
+
+/* The following function is used to convert the integer to a string */
+static char *decimal_itoa(int num, char *str)
+{
+    char index[] = "0123456789";
+    int i = 0;
+    int j = 0;
+    int radix = 10;
+    
+    do
+    {
+        str[i++]=index[num%radix];
+        num /= radix;
+    } while (num);
+    
+    str[i]='\0';
+    
+    for(j=0; j<(i/2); j++)
+    {
+        str[j] = str[j] + str[i-j-1];
+        str[i-j-1] = str[j] - str[i-j-1];
+        str[j] = str[j] - str[i-j-1];
+    }
+    
+    return str;
+}
+
+/* The following function is used to save kernel log when ext4 file system happens a error */
+void ext4_handle_kmsg(void)
+{
+    int fdKmsg = -1;
+    int fdMounts = -1;
+    int fdInfo = -1;
+    int tmpIndex = 0;
+    int tmpFlag = 0;
+    int mountFlag = 0;
+    off_t fd_seek=0;
+    char tmpbuf[10] = {0};
+    unsigned char file_index = 0;
+    mm_segment_t old_fs;
+    int file_count= 0;    
+    
+    /* The internal SD card block name, both are same */
+    char inter_sd_blk_name1[] = "/dev/block/platform/msm_sdcc.1/by-name/grow";
+    char inter_sd_blk_name2[] = "/dev/block/vold/179:25";
+    char inter_sd_dir1[] = "/mnt/sdcard";
+    char inter_sd_dir2[] = "/mnt/sdcard2";
+    
+    /* we want to check permission normally */
+    do_not_check_permission_flag = 0;
+    
+    printk("\next4_kmsg_flag is equal to : %d\n", ext4_kmsg_flag);
+    
+    /* ext4_kmsg_flag is a mutex flag, we don't want this function will be called by more than one process */
+    if (0 == ext4_kmsg_flag)
+    {
+        ext4_kmsg_flag = 1;
+        
+        /* Save the old space */
+        old_fs = get_fs();
+        /* Switch to kernel space */
+        set_fs(KERNEL_DS);
+
+        /* open mounted file, this file perhaps is  "/proc/mounts", or "/proc/fstab", or "/proc/mtab",
+           but here we only use "/proc/mounts"
+        */
+        fdMounts = sys_open(MOUNT_FILE, O_RDONLY, 0);
+        
+        printk("\nfdMounts is equal to : %d\n", fdMounts);
+        
+        if (fdMounts < 0)
+        {
+            printk("\nOpen %s failed\n", MOUNT_FILE);
+            ext4_kmsg_flag = 0;
+            
+            /* Restore the old space */
+            set_fs(old_fs);
+            return;
+        }
+    
+        /* loop read one line of the mounted file to parse */
+        while(NULL != (fget_line(line_buf, LINE_MAX, fdMounts)))
+        {
+            memset(&mnt_content, 0, sizeof(mnt_content));
+            
+            /* parse the specified one line */
+            parse_line(line_buf, &mnt_content);
+            /* if we find the internal sd card, then break */
+            if ((memcmp(mnt_content.mnt_name, inter_sd_blk_name1, sizeof(inter_sd_blk_name1)) == 0) || (memcmp(mnt_content.mnt_name, inter_sd_blk_name2, sizeof(inter_sd_blk_name2)) == 0))
+			{
+                tmpFlag = 1;
+                break;
+            }
+        }
+        /* if we don't find the internal sd card, don't exit, just mount manually */
+        if (1 != tmpFlag)
+        {
+            int err = 0;           
+            printk("\nInternal SD card is not found, now mount manually\n");
+            
+            /* if ext4 happens errors, wo don't want to check permission when mount internal sd card */
+            do_not_check_permission_flag = 1;
+            
+            /*  now mounting */
+            err = sys_mount(inter_sd_blk_name1, inter_sd_dir1, "vfat", 0, NULL);
+            if (err)
+            {
+                printk("\nInternal SD card mount failed: %d, try again!\n", err);
+                
+                err = sys_mount(inter_sd_blk_name1, inter_sd_dir2, "vfat", 0, NULL);
+                if (err)
+                {
+                    /* restore check permission flag whatever mounting failed or not */
+                    do_not_check_permission_flag = 0;
+                    
+                    printk("\nInternal SD card is not found\n");
+                    ext4_kmsg_flag = 0;
+                    sys_close(fdMounts);
+                    /* Restore the old space */
+                    set_fs(old_fs);
+                    return;
+                }
+                else
+                {
+                    /* restore check permission flag if mounting ok */
+                    do_not_check_permission_flag = 0;
+                    
+                    mountFlag = 2;
+                    printk("\nInternal SD card mount ok2!\n");
+                    memset(&mnt_content, 0, sizeof(mnt_content));
+                    strcpy(mnt_content.mnt_name, inter_sd_blk_name1);
+                    strcpy(mnt_content.mnt_dir, inter_sd_dir2);
+                }
+            }
+	        else
+            {
+                /* restore check permission flag if mounting ok */
+                do_not_check_permission_flag = 0;
+                
+                mountFlag = 1;
+                printk("\nInternal SD card mount ok1!\n");
+                memset(&mnt_content, 0, sizeof(mnt_content));
+                strcpy(mnt_content.mnt_name, inter_sd_blk_name1);
+                strcpy(mnt_content.mnt_dir, inter_sd_dir1);
+            }
+        }
+        
+        printk("\nInternal SD card block name is : %s\n", mnt_content.mnt_name);
+        printk("\nInternal SD card is mounted on : %s\n", mnt_content.mnt_dir);
+    
+        strcat(mnt_content.mnt_dir, LOG_PATH);
+        
+        /* save the current directory */
+        tmpIndex = strlen(mnt_content.mnt_dir);
+    
+        /* we need to create ext4_error_log folder defined by LOG_PATH in the internal sdcard root directory*/
+        sys_mkdir(mnt_content.mnt_dir, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+
+        /* Here read Info.txt which record the corrent file index, if no Info.txt, just create it */
+        strcat(mnt_content.mnt_dir, "/Info.txt");
+        fdInfo = sys_open(mnt_content.mnt_dir, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+        if (fdInfo < 0)
+        {
+            printk("\nCan't open info file\n");
+            ext4_kmsg_flag = 0;
+            sys_close(fdMounts);
+            /* Restore the old space */
+            set_fs(old_fs);
+            return;
+        }
+        else
+        {
+            fd_seek = 0;
+            if (NULL != fget_line(line_buf, LINE_MAX, fdInfo))
+            {
+                int i = 0;
+                int result = 0;
+                
+                while (line_buf[i])
+                {
+                    result = (result * 10) + (line_buf[i] - '0');
+                    i++;
+                }
+                file_count = result;
+                file_index = file_count%10;
+                printk("file_count=%d, file_index=%d\n", file_count,file_index);
+            }
+        }
+        
+        /* restore the current directory */
+        while (mnt_content.mnt_dir[tmpIndex])
+        {
+            mnt_content.mnt_dir[tmpIndex] = 0;
+            tmpIndex++;
+            if (tmpIndex >= sizeof(mnt_content.mnt_dir))
+            {
+                break;
+            }
+        }
+    
+        /* make the log file name */
+        memset(tmpbuf, 0, sizeof(tmpbuf));
+        decimal_itoa(file_index, tmpbuf);
+        strcat(mnt_content.mnt_dir, LOG_PATH);
+        strcat(mnt_content.mnt_dir, tmpbuf);
+        strcat(mnt_content.mnt_dir, ".txt");
+    
+        printk("\nThe log path is : %s\n", mnt_content.mnt_dir);
+    
+        /* create the log file */
+        fdKmsg = sys_open(mnt_content.mnt_dir, O_RDWR | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+        if (fdKmsg >= 0)
+        {
+            int lenKmsg = 0;
+        
+            /* write kernel log to the file */
+            lenKmsg = sys_write(fdKmsg, kmsg_buf, KMSG_BUF_LEN);
+            if (KMSG_BUF_LEN != lenKmsg)
+            {
+                printk("\nlenKmsg is not equal to KMSG_BUF_LEN\n");
+            }
+        }
+        else
+        {
+            printk("\nfdKmsg is equal to: %d\n", fdKmsg);
+            ext4_kmsg_flag = 0;
+            sys_close(fdMounts);
+            sys_close(fdInfo);
+            /* Restore the old space */
+            set_fs(old_fs);
+            return;
+        }
+        /* save last 10 files loop  */
+        file_count++;
+        
+        /* we need to record the current file index */
+        memset(tmpbuf, 0, sizeof(tmpbuf));
+        decimal_itoa(file_count, tmpbuf);
+        strcat(tmpbuf, "\n");
+        sys_lseek(fdInfo, 0, SEEK_SET);
+        sys_write(fdInfo, tmpbuf, strlen(tmpbuf));
+
+        /* Update to eMMC */
+        sys_fsync(fdKmsg);
+        sys_fsync(fdInfo);
+
+        /* close the opened file */
+        sys_close(fdKmsg);
+        sys_close(fdMounts);
+        sys_close(fdInfo);
+    
+        /* Restore the old space */
+        set_fs(old_fs);
+        
+        /* release the mutex flag */
+        ext4_kmsg_flag = 0;
+    }
+    
+    return;
+}
+#endif
 
 static void ext4_handle_error(struct super_block *sb)
 {
 	if (sb->s_flags & MS_RDONLY)
 		return;
+#ifdef CONFIG_EXT4_HUAWEI_DEBUG    
+    printk("\next4_handle_kmsg is called\n");
+    ext4_handle_kmsg();
+#endif
 
 	if (!test_opt(sb, ERRORS_CONT)) {
 		journal_t *journal = EXT4_SB(sb)->s_journal;
@@ -483,6 +849,32 @@ static void ext4_handle_error(struct super_block *sb)
 	if (test_opt(sb, ERRORS_PANIC))
 		panic("EXT4-fs (device %s): panic forced after error\n",
 			sb->s_id);
+#ifdef CONFIG_EXT4_HUAWEI_READ_ONLY_RECOVERY
+{
+	struct ext4_super_block *es = EXT4_SB(sb)->s_es;
+
+    /* Update error status flag and restart */
+	es->s_state |= cpu_to_le16(EXT4_ERROR_FS);
+    ext4_commit_super(sb, 1);
+#ifdef CONFIG_FEATURE_HUAWEI_EMERGENCY_DATA
+    /*
+     * if is factory mode, same to orignal.
+     * if flag equal to 0, this phone boot not caused by ext4_handle_error, so reboot.
+     * if flag equal to 1, this phone boot caused by ext4_handle_error, so not reboot again.
+     */
+    if (is_runmode_factory()) { // factory mode
+        kernel_restart(NULL);
+    } else { // not factory mode
+        if (get_datamount_flag() == 0) {
+            kernel_restart("mountfail");
+        }
+    }
+#else
+    kernel_restart(NULL);
+#endif
+}
+#endif
+    
 }
 
 void __ext4_error(struct super_block *sb, const char *function,
@@ -4883,7 +5275,19 @@ static void ext4_exit_feat_adverts(void)
 	wait_for_completion(&ext4_feat->f_kobj_unregister);
 	kfree(ext4_feat);
 }
+#ifdef CONFIG_EXT4_HUAWEI_DEBUG 
+static struct dentry *dentry_mmclog;
+static int ext4_log_enable_get(void *data,u64 *val)
+{
+    printk("\next4_handle_kmsg is called\n");
+    *val =1;
+    ext4_handle_kmsg();
 
+return 0;
+}
+
+DEFINE_SIMPLE_ATTRIBUTE(ext4log_enable_fops,ext4_log_enable_get, NULL, "%llu\n");
+#endif
 /* Shared across all ext4 file systems */
 wait_queue_head_t ext4__ioend_wq[EXT4_WQ_HASH_SZ];
 struct mutex ext4__aio_mutex[EXT4_WQ_HASH_SZ];
@@ -4901,7 +5305,14 @@ static int __init ext4_init_fs(void)
 		mutex_init(&ext4__aio_mutex[i]);
 		init_waitqueue_head(&ext4__ioend_wq[i]);
 	}
-
+#ifdef CONFIG_EXT4_HUAWEI_DEBUG 
+    dentry_mmclog = debugfs_create_dir("hw_ext4_debug", NULL);
+    if(dentry_mmclog )
+    {
+        debugfs_create_file("ext4_log", S_IFREG|S_IRWXU|S_IRGRP|S_IROTH,
+            dentry_mmclog, NULL, &ext4log_enable_fops);
+    }
+#endif
 	err = ext4_init_pageio();
 	if (err)
 		return err;

@@ -90,7 +90,7 @@ static ssize_t rmi_fn_34_blocksize_store(struct device *dev,
 
 /* define the device attributes using DEVICE_ATTR macros */
 DEVICE_ATTR(status, 0444, rmi_fn_34_status_show, rmi_fn_34_status_store);  /* RO attr */
-DEVICE_ATTR(cmd, 0664, rmi_fn_34_cmd_show, rmi_fn_34_cmd_store);     /* RW attr */
+DEVICE_ATTR(cmd, 0644, rmi_fn_34_cmd_show, rmi_fn_34_cmd_store);     /* RW attr */
 DEVICE_ATTR(bootloaderid, 0644, rmi_fn_34_bootloaderid_show, rmi_fn_34_bootloaderid_store); /* RW attr */
 DEVICE_ATTR(blocksize, 0444, rmi_fn_34_blocksize_show, rmi_fn_34_blocksize_store);    /* RO attr */
 

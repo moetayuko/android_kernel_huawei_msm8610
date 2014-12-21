@@ -1,0 +1,5 @@
+/include/ "tianma-nt35516-4p5-qhd-cmd.dtsi"
+/include/ "boe-nt35517-4p5-qhd-video.dtsi"
+/include/ "tianma-otm9605a-4p5-qhd-video.dtsi"
+/include/ "truly-hx8389b-4p5-qhd-video.dtsi"
+/include/ "default-lcd.dtsi"

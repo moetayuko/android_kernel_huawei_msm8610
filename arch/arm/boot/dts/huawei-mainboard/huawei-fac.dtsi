@@ -1,0 +1,9 @@
+ / {
+        huawei_fac_info {
+                  compatible = "huawei,hw_fac_info";
+                  fac,product_name = "MAINBOARD";
+                  fac,hardware_ver = "MAINBOARD_VERA";
+		  fac,software_ver = "MSM8x10_MAINBOARD";
+                  status = "ok";
+        };
+};

@@ -1144,4 +1144,9 @@ config RTC_DRV_QPNP
 	  To compile this driver as a module, choose M here: the
 	  module will be called qpnp-rtc.
 
+config HUAWEI_FEATURE_POWEROFF_ALARM
+        bool "HUAWEI PowerOff Alarm"
+        depends on HUAWEI_KERNEL
+        default n
+
 endif # RTC_CLASS

@@ -27,6 +27,45 @@
 
 #include <linux/input/rmi_platformdata.h>
 
+/* define the log level for tp driver */
+#define TP_ERR  1
+#define TP_INFO 2
+#define TP_DBG  3
+extern int synaptics_debug_mask;
+
+#ifndef tp_log_err
+#define tp_log_err(x...)                \
+do{                                     \
+    if( synaptics_debug_mask >= TP_ERR )   \
+    {                                   \
+        printk(KERN_ERR "[SYNP] " x); \
+    }                                   \
+                                        \
+}while(0)
+#endif
+
+#ifndef tp_log_info
+#define tp_log_info(x...)               \
+do{                                     \
+    if( synaptics_debug_mask >= TP_INFO )  \
+    {                                   \
+        printk(KERN_ERR "[SYNP] " x); \
+    }                                   \
+                                        \
+}while(0)
+#endif
+
+#ifndef tp_log_debug
+#define tp_log_debug(x...)              \
+do{                                     \
+    if( synaptics_debug_mask >= TP_DBG )   \
+    {                                   \
+        printk(KERN_ERR "[SYNP] " x); \
+    }                                   \
+                                        \
+}while(0)
+#endif
+
 /* Sensor-specific configuration data, to be included as the platform data
  * for the relevant i2c_board_info entry.
  *

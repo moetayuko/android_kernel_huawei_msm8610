@@ -51,6 +51,9 @@ static int msm_proxy_rx_ch = 2;
 static struct platform_device *spdev;
 static int ext_spk_amp_gpio = -1;
 
+//merge the headset detect code from es4 baseline
+/* merge qcom patch to solve the headset detect problem in FC baseline*/
+
 /* pointers for digital codec register mappings */
 static void __iomem *pcbcr;
 static void __iomem *prcgr;
@@ -527,6 +530,12 @@ exit:
 	return ret;
 }
 
+/* define headset scope value */
+#ifdef CONFIG_HUAWEI_KERNEL
+#define HEADSET_TYPE_MAX_VALUE   1850
+#define HEADSET_BUTTON_MIN_VALUE -100
+#define HEADSET_BUTTON_MAX_VALUE 50
+#endif
 static void *def_msm8x10_wcd_mbhc_cal(void)
 {
 	void *msm8x10_wcd_cal;
@@ -559,7 +568,12 @@ static void *def_msm8x10_wcd_mbhc_cal(void)
 #undef S
 #define S(X, Y) ((WCD9XXX_MBHC_CAL_PLUG_TYPE_PTR(msm8x10_wcd_cal)->X) = (Y))
 	S(v_no_mic, 30);
+/* change to commonly use value */
+#ifndef CONFIG_HUAWEI_KERNEL
 	S(v_hs_max, 2550);
+#else
+	S(v_hs_max, HEADSET_TYPE_MAX_VALUE);
+#endif
 #undef S
 #define S(X, Y) ((WCD9XXX_MBHC_CAL_BTN_DET_PTR(msm8x10_wcd_cal)->X) = (Y))
 	S(c[0], 62);
@@ -577,8 +591,14 @@ static void *def_msm8x10_wcd_mbhc_cal(void)
 	btn_low = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg, MBHC_BTN_DET_V_BTN_LOW);
 	btn_high = wcd9xxx_mbhc_cal_btn_det_mp(btn_cfg,
 					       MBHC_BTN_DET_V_BTN_HIGH);
+/* change to commonly use value (had used in 8930 platform)*/
+#ifndef CONFIG_HUAWEI_KERNEL
 	btn_low[0] = -50;
 	btn_high[0] = 10;
+#else
+	btn_low[0] = HEADSET_BUTTON_MIN_VALUE;
+	btn_high[0] = HEADSET_BUTTON_MAX_VALUE;
+#endif
 	btn_low[1] = 11;
 	btn_high[1] = 52;
 	btn_low[2] = 53;

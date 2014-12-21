@@ -1,0 +1,7 @@
+/{
+	hw-dev-detect {
+		compatible = "huawei,hw-dev-detect";
+		reg = <0x8610 0x0>;
+		status = "ok";
+	};
+};

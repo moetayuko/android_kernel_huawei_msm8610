@@ -1,0 +1,113 @@
+/*use fromdos convert file format to linux*/
+/* Copyright (c) 2013 The Linux Foundation. All rights reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ */
+ &soc {
+	i2c@f9925000 { /* BLSP-1 QUP-3 */
+			/*don't use the acc device, delete it.*/
+
+		Rohm@1e {
+			compatible = "gs,Rohm_accel";
+			reg = <0x1e>;
+			gs,int1_gpio = <81>;
+			gs,int2_gpio = <82>;
+			/*	COMPASS_TOP_GS_TOP 			=0, */
+			/*	COMPASS_TOP_GS_BOTTOM 		=1, */
+			/*	COMPASS_BOTTOM_GS_TOP 		=2, */
+			/*	COMPASS_BOTTOM_GS_BOTTOM	       =3, */
+			/*	COMPASS_NONE_GS_BOTTOM		=4, */
+			/*	COMPASS_NONE_GS_TOP			=5, */
+			gs,compass_gs_position = <1>;
+			gs,min_interval = <5>;
+			gs,poll_interval = <200>;
+			gs,accel_direction = <1>;
+			gs,accel_irq_use_drdy = <1>;
+			gs,accel_g_range = <0>;
+			gs,accel_res = <0>;
+		};
+
+		gs_st_lis3xh@18 {
+			compatible = "gs,gs_st_lis3xh";
+			reg = <0x18>;
+			/*don't need set vdd and vddio, we use ldo19 on 8x12*/
+			gs,int1_gpio = <81>;
+			gs,int2_gpio = <82>;
+			/*	COMPASS_TOP_GS_TOP 			=0, */
+			/*	COMPASS_TOP_GS_BOTTOM 		=1, */
+			/*	COMPASS_BOTTOM_GS_TOP 		=2, */
+			/*	COMPASS_BOTTOM_GS_BOTTOM	       =3, */
+			/*	COMPASS_NONE_GS_BOTTOM		=4, */
+			/*	COMPASS_NONE_GS_TOP			=5, */
+			gs,compass_gs_position = <1>;
+			gs,accel_g_range = <0>;
+			gs,accel_res = <0>;
+		};
+
+		intersil@44 {
+			compatible = "intersil,isl29044";
+			reg = <0x44>;
+			intersil,min_proximity_value = <235>;
+			intersil,pwnd_value = <151>;
+			intersil,pwave_value = <20>;
+			intersil,interrupt_upper = <220>;
+			intersil,interrupt_lower = <210>;
+		};
+
+		aps-9930@39 {
+			compatible = "tmd277x,aps-9930";
+			reg = <0x39>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <80 0x2>;
+			aps,int_gpio = <80>;
+			aps,window = <170>;
+			aps,wave = <92>;	
+			aps,fall = <0>;	
+			/*aps,sunlight = <100>;*/
+			/*avago lsensor adc table */
+ 			aps,adc_array = <9 25 110 400 750 1200 3200>;
+			tmd2772,prox_th_min = <255>;
+			tmd2772,prox_th_max = <480>;
+			tmd2772,als_gate = <10>;
+		};
+		/*add tmd27713 sensor*/
+		taos@3A {
+			compatible = "taos,tmd27713";
+			reg = <0x3A>; /*use the 0x3A to fake i2c addr regiest devices*/
+			interrupt-parent = <&msmgpio>;
+			interrupts = <80 0x2>;
+			taos,real_i2c_addr = <0x39>; /*the real i2c addr*/
+			taos,pdrive = <3>;
+			taos,ppcount = <8>;
+			taos,irq_gpio = <80>;
+			taos,prox_th_min = <255>;
+			taos,prox_th_max = <480>;
+			taos,prox_wave = <235>;
+			taos,prox_window = <358>;
+		};
+
+		akm8963@e {	
+			compatible = "AKM,akm8963";
+			reg = <0x0e>;
+			interrupt-parent = <&msmgpio>;
+			interrupts = <83 0x2>;
+			akm8963,min_interval = <10>;		
+			akm,int_gpio = <83>;
+			akm,rst_gpio = <84>;
+			/*	COMPASS_TOP_GS_TOP 			=0, */
+			/*	COMPASS_TOP_GS_BOTTOM 		=1, */
+			/*	COMPASS_BOTTOM_GS_TOP 		=2, */
+			/*	COMPASS_BOTTOM_GS_BOTTOM	       =3, */
+			/*	COMPASS_NONE_GS_BOTTOM		=4, */
+			/*	COMPASS_NONE_GS_TOP			=5, */
+			akm,chip_pisition = <1>;
+		};
+	};
+};

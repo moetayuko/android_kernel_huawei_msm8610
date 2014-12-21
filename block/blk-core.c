@@ -35,6 +35,10 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/block.h>
 
+#ifdef CONFIG_MMC_WP_SYSTEM
+#include <linux/mmc/card.h>
+#endif
+
 #include "blk.h"
 
 EXPORT_TRACEPOINT_SYMBOL_GPL(block_bio_remap);
@@ -43,6 +47,9 @@ EXPORT_TRACEPOINT_SYMBOL_GPL(block_bio_complete);
 
 DEFINE_IDA(blk_queue_ida);
 
+#ifdef CONFIG_MMC_WP_SYSTEM
+bool mmc_wp_partition_enable = true;
+#endif
 /*
  * For the allocated request tables
  */
@@ -1612,6 +1619,10 @@ static inline int bio_check_eod(struct bio *bio, unsigned int nr_sectors)
 	return 0;
 }
 
+#ifdef CONFIG_MMC_WP_SYSTEM
+extern void ext4_handle_kmsg(void);
+#endif
+
 static noinline_for_stack bool
 generic_make_request_checks(struct bio *bio)
 {
@@ -1622,6 +1633,30 @@ generic_make_request_checks(struct bio *bio)
 	struct hd_struct *part;
 
 	might_sleep();
+
+	#ifdef CONFIG_MMC_WP_SYSTEM
+	if (!strcmp(bdevname(bio->bi_bdev,b), MMC_WP_SYSTEM_PARTNO) && (bio->bi_rw & WRITE)&&
+		mmc_wp_partition_enable){
+
+        if(NULL != bio->bi_bdev->bd_super){
+		    // If the system mount property is rw. Don't record the log. It may in app debug screen.
+	        if(strcmp(current->comm,"mount") && strcmp(current->comm,"adbd") && (bio->bi_bdev->bd_super->s_flags & MS_RDONLY))
+	        {
+				printk(KERN_ERR
+				"%s(%d): Write to protected emmc %s size=%u(sectors) start_address=%Lu(sector)\n",
+				current->comm, task_pid_nr(current),bdevname(bio->bi_bdev,b),
+				bio_sectors(bio),(long long)bio->bi_sector);
+
+	           //record the log into sdcard/ext4_error_log/
+	           ext4_handle_kmsg();
+	        }
+		}
+		else
+		{
+	        printk(KERN_INFO "bio->bi_bdev->bd_super is NULL then goto next \n");
+		}
+	}
+	#endif
 
 	if (bio_check_eod(bio, nr_sectors))
 		goto end_io;

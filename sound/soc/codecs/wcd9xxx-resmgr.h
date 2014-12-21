@@ -21,13 +21,13 @@ enum wcd9xxx_bandgap_type {
 	WCD9XXX_BANDGAP_AUDIO_MODE,
 	WCD9XXX_BANDGAP_MBHC_MODE,
 };
-
 enum wcd9xxx_cdc_type {
 	WCD9XXX_CDC_TYPE_INVALID = 0,
 	WCD9XXX_CDC_TYPE_TAIKO,
 	WCD9XXX_CDC_TYPE_TAPAN,
 	WCD9XXX_CDC_TYPE_HELICON,
 };
+
 
 enum wcd9xxx_clock_type {
 	WCD9XXX_CLK_OFF,

@@ -434,6 +434,7 @@ config INPUT_ISA1200_FF_MEMLESS
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called isa1200-ff-memless.
+# /* move to \kernel\drivers\input\misc_hw */
 
 config HP_SDC_RTC
 	tristate "HP SDC Real Time Clock"
@@ -650,9 +651,20 @@ config BOSCH_BMA150
 config STM_LIS3DH
         tristate "STM LIS3DH acceleration sensor support"
         depends on I2C=y
+	default n
         help
           If you say yes here you get support for STMicroelectronics's
           acceleration sensors LIS3DH.
+
+config INPUT_KIONIX_ACCEL
+		tristate "KIONIX_ACCEL"
+		depends on I2C && SYSFS
+		default n
+		help
+		  If you say yes here you get support for the Kionix digital 3-axis
+		  accelerometer.
+		  This driver can also be built as a module. If so, the module will be
+		  called kionix_accel.
 
 config BMP18X
        tristate "BMP18X digital pressure sensor"
@@ -703,6 +715,12 @@ config SENSORS_STK3X1X
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called stk3x1x.
+config TMD27713_PLSENSOR
+   tristate "TAOS tmd27713 P/L senosr"
+   depends on I2C=y
+
+   help
+       This option enables support for the TAOS tmd27713 P/L sensor.
 
 config SENSORS_CAPELLA_CM36283
 	tristate "CM36283 proximity and light sensor"
@@ -714,4 +732,21 @@ config SENSORS_CAPELLA_CM36283
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called CM36283.
+
+config SENSORS_TMD27723
+       tristate "TAOS TMD27723 proximity and ambient light sensor"
+       depends on I2C
+       default n
+       help
+         If you say yes here you get support for the TAOS tmd27723,
+         proximity and ambient light sensors.
+         This driver can also be built as a module.  If so, the module
+         will be called tmd277x.
+
+config INTERSIL_ISL29044
+       tristate "INTERSIL P/L sensor"
+       depends on I2C
+       help
+         This option enables support for the INTERSIL ISL29044 P/L sensor.
+
 endif

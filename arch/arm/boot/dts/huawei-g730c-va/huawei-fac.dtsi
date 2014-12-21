@@ -1,0 +1,9 @@
+ / {
+        huawei_fac_info {
+                  compatible = "huawei,hw_fac_info";
+                  fac,product_name = "G730_C10";
+                  fac,hardware_ver = "HC1G730TM_VERA";
+		  fac,software_ver = "MSM8x10_G730_C10_va";
+                  status = "ok";
+        };
+};

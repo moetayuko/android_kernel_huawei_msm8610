@@ -14,5 +14,19 @@
 /include/ "dsi-panel-truly-wvga-cmd.dtsi"
 /include/ "dsi-panel-nt35590-720p-video.dtsi"
 /include/ "dsi-panel-otm8018b-fwvga-video.dtsi"
+
+/*G620 LCD*/
 /include/ "dsi-panel-hx8379a-wvga-video.dtsi"
 /include/ "dsi-panel-hx8389b-qhd-video.dtsi"
+/include/ "dsi-panel-tianma-hx8389b-5p5-qhd-video.dtsi"
+/*END G620 LCD*/
+
+/*G730C LCD*/
+/include/ "dsi-panel-boe-nt35517-5-qhd-video.dtsi"
+/include/ "dsi-panel-byd-nt35517-5p5-qhd-video.dtsi"
+/include/ "dsi-panel-boe-nt35517-5p5-qhd-video.dtsi"
+/include/ "dsi-panel-auo-nt35517-5p5-qhd-video.dtsi"
+/include/ "dsi-panel-auo-otm9605a-5p5-qhd-video.dtsi"
+/include/ "dsi-panel-tianma-otm9605a-5-qhd-video.dtsi"
+/*END G730C LCD*/
+/include/ "dsi-panel-emulator-qhd-video.dtsi"

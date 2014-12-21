@@ -83,7 +83,10 @@
 #define FB_TYPE_3D_PANEL 0x10101010
 #define MDP_IMGTYPE2_START 0x10000
 #define MSMFB_DRIVER_VERSION	0xF9E8D701
-
+#ifdef CONFIG_FB_AUTO_CABC
+#define MSMFB_AUTO_CABC           _IOWR(MSMFB_IOCTL_MAGIC, 255, struct msmfb_cabc_config)
+#endif
+/* Delete code that we don't use */
 enum {
 	NOTIFY_UPDATE_START,
 	NOTIFY_UPDATE_STOP,
@@ -871,7 +874,22 @@ struct mdp_page_protection {
 	uint32_t page_protection;
 };
 
-
+#ifdef CONFIG_FB_AUTO_CABC
+/* define cabc_mode include CABC_MODE_UI,CABC_MODE_STILL,etc */
+enum cabc_mode {
+    CABC_MODE_OFF,
+    CABC_MODE_UI,
+    CABC_MODE_STILL,
+    CABC_MODE_MOVING,
+};
+/* define msmfb_cabc_config to use for cabc mode etc */
+struct msmfb_cabc_config {
+    uint32_t mode;
+    uint32_t dimming_on;
+    uint32_t mov_det_on;
+};
+#endif
+/* Delete code that we don't use */
 struct mdp_mixer_info {
 	int pndx;
 	int pnum;

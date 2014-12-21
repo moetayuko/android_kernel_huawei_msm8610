@@ -309,6 +309,8 @@ enum {
 	DSI_CTRL_MAX,
 };
 
+/* recreat lcd dts in fc1 baseline */
+
 #define DSI_EV_PLL_UNLOCKED		0x0001
 #define DSI_EV_MDP_FIFO_UNDERFLOW	0x0002
 #define DSI_EV_MDP_BUSY_RELEASE		0x80000000
@@ -317,8 +319,12 @@ struct mdss_dsi_ctrl_pdata {
 	int ndx;	/* panel_num */
 	int (*on) (struct mdss_panel_data *pdata);
 	int (*off) (struct mdss_panel_data *pdata);
+
+	void (*dsi_bklt_dcs) (struct mdss_dsi_ctrl_pdata *ctrl, int level);
+
 	int (*partial_update_fnc) (struct mdss_panel_data *pdata);
 	int (*check_status) (struct mdss_dsi_ctrl_pdata *pdata);
+	
 	struct mdss_panel_data panel_data;
 	unsigned char *ctrl_base;
 	int reg_size;
@@ -373,6 +379,15 @@ struct mdss_dsi_ctrl_pdata {
 
 	struct dsi_buf tx_buf;
 	struct dsi_buf rx_buf;
+#ifdef CONFIG_FB_AUTO_CABC
+	struct dsi_panel_cmds dsi_panel_cabc_ui_cmds;
+	struct dsi_panel_cmds dsi_panel_cabc_video_cmds;
+	int (*config_cabc) (struct mdss_panel_data *pdata,struct msmfb_cabc_config cabc_cfg);
+#endif
+	int bias_enp_gpio;
+	int bias_enn_gpio;
+	int bias_enp_gpio_requested;
+	int bias_enn_gpio_requested;
 };
 
 int dsi_panel_device_register(struct device_node *pan_node,

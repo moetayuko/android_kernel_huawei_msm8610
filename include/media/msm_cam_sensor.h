@@ -321,6 +321,8 @@ struct msm_sensor_info_t {
 	char sensor_name[MAX_SENSOR_NAME];
 	int32_t    session_id;
 	int32_t     subdev_id[SUB_MODULE_MAX];
+    /*add project name for the project menu*/
+    char sensor_project_name[MAX_SENSOR_NAME];
 };
 
 struct camera_vreg_t {
@@ -434,6 +436,9 @@ enum msm_sensor_cfg_type_t {
 	CFG_SET_WHITE_BALANCE,
 	CFG_SET_AUTOFOCUS,
 	CFG_CANCEL_AUTOFOCUS,
+    CFG_GET_SENSOR_PROJECT_INFO,
+	CFG_SET_OTP_INFO, 
+    
 };
 
 enum msm_actuator_cfg_type_t {
@@ -532,6 +537,9 @@ enum af_camera_name {
 	ACTUATOR_MAIN_CAM_3,
 	ACTUATOR_MAIN_CAM_4,
 	ACTUATOR_MAIN_CAM_5,
+	ACTUATOR_MAIN_CAM_6,
+	ACTUATOR_MAIN_CAM_7,
+	ACTUATOR_MAIN_CAM_8,
 	ACTUATOR_WEB_CAM_0,
 	ACTUATOR_WEB_CAM_1,
 	ACTUATOR_WEB_CAM_2,
@@ -567,6 +575,9 @@ enum msm_camera_led_config_t {
 	MSM_CAMERA_LED_HIGH,
 	MSM_CAMERA_LED_INIT,
 	MSM_CAMERA_LED_RELEASE,
+	MSM_CAMERA_LED_TORCH = 16,
+	MSM_CAMERA_LED_TORCH_POWER_NORMAL = 108,	//108
+	MSM_CAMERA_LED_TORCH_POWER_ABNORMAL,			//109
 };
 
 struct msm_camera_led_cfg_t {

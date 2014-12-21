@@ -124,6 +124,14 @@ struct bms_battery_data {
 	int			cutoff_uv;
 	int			iterm_ua;
 	int			batt_id_kohm;
+	int			warm_bat_decidegc;
+	int			warm_bat_chg_ma;
+	int			warm_bat_mv;
+	int			cool_bat_decidegc;
+	int			cool_bat_chg_ma;
+	int			cool_bat_mv;
+	int			cold_bat_decidegc;
+	int			hot_bat_decidegc;
 };
 
 #if defined(CONFIG_PM8921_BMS) || \
@@ -134,6 +142,8 @@ extern struct bms_battery_data  desay_5200_data;
 extern struct bms_battery_data  oem_batt_data;
 extern struct bms_battery_data QRD_4v35_2000mAh_data;
 extern struct bms_battery_data  qrd_4v2_1300mah_data;
+extern struct bms_battery_data  Huawei_HB4742A0RBW_SCUD_2420mAh_data;
+extern struct bms_battery_data  Huawei_HB4742A0RBW_LG_2420mAh_data;
 
 int interpolate_fcc(struct single_row_lut *fcc_temp_lut, int batt_temp);
 int interpolate_scalingfactor(struct sf_lut *sf_lut, int row_entry, int pc);

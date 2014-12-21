@@ -85,8 +85,8 @@ static ssize_t rmi_fn_11_flip_show(struct device *dev,
 static ssize_t rmi_fn_11_flip_store(struct device *dev,
 				struct device_attribute *attr,
 				const char *buf, size_t count);
-
-DEVICE_ATTR(flip, 0664, rmi_fn_11_flip_show, rmi_fn_11_flip_store);     /* RW attr */
+/*Modified the sysfs permission as user read-write alone*/
+DEVICE_ATTR(flip, 0644, rmi_fn_11_flip_show, rmi_fn_11_flip_store);     /* RW attr */
 
 static ssize_t rmi_fn_11_clip_show(struct device *dev,
 				struct device_attribute *attr, char *buf);
@@ -95,7 +95,7 @@ static ssize_t rmi_fn_11_clip_store(struct device *dev,
 				struct device_attribute *attr,
 				const char *buf, size_t count);
 
-DEVICE_ATTR(clip, 0664, rmi_fn_11_clip_show, rmi_fn_11_clip_store);     /* RW attr */
+DEVICE_ATTR(clip, 0644, rmi_fn_11_clip_show, rmi_fn_11_clip_store);     /* RW attr */
 
 static ssize_t rmi_fn_11_offset_show(struct device *dev,
 				struct device_attribute *attr, char *buf);
@@ -104,7 +104,7 @@ static ssize_t rmi_fn_11_offset_store(struct device *dev,
 				struct device_attribute *attr,
 				const char *buf, size_t count);
 
-DEVICE_ATTR(offset, 0664, rmi_fn_11_offset_show, rmi_fn_11_offset_store);     /* RW attr */
+DEVICE_ATTR(offset, 0644, rmi_fn_11_offset_show, rmi_fn_11_offset_store);     /* RW attr */
 
 static ssize_t rmi_fn_11_swap_show(struct device *dev,
 				struct device_attribute *attr, char *buf);
@@ -113,7 +113,7 @@ static ssize_t rmi_fn_11_swap_store(struct device *dev,
 				struct device_attribute *attr,
 				const char *buf, size_t count);
 
-DEVICE_ATTR(swap, 0664, rmi_fn_11_swap_show, rmi_fn_11_swap_store);     /* RW attr */
+DEVICE_ATTR(swap, 0644, rmi_fn_11_swap_show, rmi_fn_11_swap_store);     /* RW attr */
 
 static ssize_t rmi_fn_11_relreport_show(struct device *dev,
 				struct device_attribute *attr, char *buf);
@@ -122,7 +122,7 @@ static ssize_t rmi_fn_11_relreport_store(struct device *dev,
 				struct device_attribute *attr,
 				const char *buf, size_t count);
 
-DEVICE_ATTR(relreport, 0664, rmi_fn_11_relreport_show, rmi_fn_11_relreport_store);     /* RW attr */
+DEVICE_ATTR(relreport, 0644, rmi_fn_11_relreport_show, rmi_fn_11_relreport_store);     /* RW attr */
 
 static ssize_t rmi_fn_11_maxPos_show(struct device *dev,
 				struct device_attribute *attr, char *buf);
@@ -131,8 +131,7 @@ static ssize_t rmi_fn_11_maxPos_store(struct device *dev,
 				struct device_attribute *attr,
 				const char *buf, size_t count);
 
-DEVICE_ATTR(maxPos, 0664, rmi_fn_11_maxPos_show, rmi_fn_11_maxPos_store);     /* RW attr */
-
+DEVICE_ATTR(maxPos, 0644, rmi_fn_11_maxPos_show, rmi_fn_11_maxPos_store);     /* RW attr */
 
 static void FN_11_relreport(struct rmi_function_info *rmifninfo);
 

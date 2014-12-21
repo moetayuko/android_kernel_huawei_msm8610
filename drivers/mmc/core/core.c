@@ -1031,10 +1031,17 @@ int mmc_interrupt_hpi(struct mmc_card *card)
 
 	BUG_ON(!card);
 
+#ifdef CONFIG_HUAWEI_KERNEL 
+	if ((!card->ext_csd.hpi_en)&&(!card->ext_csd.hpi_bkops_en)) {
+		pr_info("%s: HPI enable bit unset\n", mmc_hostname(card->host));
+		return 1;
+	}
+#else
 	if (!card->ext_csd.hpi_en) {
 		pr_info("%s: HPI enable bit unset\n", mmc_hostname(card->host));
 		return 1;
 	}
+#endif
 
 	mmc_claim_host(card->host);
 	err = mmc_send_status(card, &status);

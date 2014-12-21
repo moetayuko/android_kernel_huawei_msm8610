@@ -1,0 +1,9 @@
+ / {
+        huawei_fac_info {
+                  compatible = "huawei,hw_fac_info";
+                  fac,product_name = "G6_U34";
+                  fac,hardware_ver = "HC1G6TM_VERA";
+		  fac,software_ver = "MSM8x12_G6_U34_va";
+                  status = "ok";
+        };
+};
