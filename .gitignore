@@ -33,6 +33,9 @@ modules.builtin
 *.patch
 *.gcno
 
+# Wi-fi firmware
+!drivers/staging/prima/firmware_bin/WCNSS_qcom_wlan_nv.bin
+
 #
 # Top-level generic files
 #
